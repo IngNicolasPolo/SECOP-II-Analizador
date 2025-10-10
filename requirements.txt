@@ -1,5 +1,8 @@
-streamlit
-pandas
-plotly
-openpyxl
-xlsxwriter
+streamlit>=1.36
+pandas>=2.0
+plotly>=5.20
+gspread>=6.0
+google-auth>=2.29
+google-auth-oauthlib>=1.2
+google-auth-httplib2>=0.2
+xlsxwriter>=3.2
