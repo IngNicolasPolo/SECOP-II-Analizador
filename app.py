@@ -25,16 +25,35 @@ _SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
+import gspread
+from google.oauth2.service_account import Credentials
+import streamlit as st
+
+_SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
+
 def get_gcp_creds():
-    """Usa secrets en la nube y archivo local cuando ejecutas en PC."""
-    try:
-        info = st.secrets["gcp_service_account"]  # toma del panel de Secrets
+    """
+    En Streamlit Cloud usa st.secrets['gcp_service_account'].
+    En local, si quieres, puede usar el archivo .json (opcional).
+    """
+    if "gcp_service_account" in st.secrets:
+        info = dict(st.secrets["gcp_service_account"])
+        # Arregla saltos de línea en la private_key si vienen como \n
+        if "private_key" in info:
+            info["private_key"] = info["private_key"].replace("\\n", "\n")
         return Credentials.from_service_account_info(info, scopes=_SCOPES)
-    except Exception:
+    else:
+        # ← Opcional: solo para ejecutar en tu PC local.
         return Credentials.from_service_account_file(
-            "verdant-branch-474621-d7-f60501841517.json",  # tu archivo local
-            scopes=_SCOPES
+            "verdant-branch-474621-d7-f60501841517.json",
+            scopes=_SCOPES,
         )
+
+_GC = gspread.authorize(get_gcp_creds())
+
 
 # cliente gspread autorizado
 _GC = gspread.authorize(get_gcp_creds())
