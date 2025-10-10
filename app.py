@@ -24,12 +24,20 @@ _SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
-_CREDS = Credentials.from_service_account_file(
-    "verdant-branch-474621-d7-f60501841517.json",  # nombre del .json en tu carpeta
-    scopes=_SCOPES,
-)
-_GC = gspread.authorize(_CREDS)
 
+def get_gcp_creds():
+    """Usa secrets en la nube y archivo local cuando ejecutas en PC."""
+    try:
+        info = st.secrets["gcp_service_account"]  # toma del panel de Secrets
+        return Credentials.from_service_account_info(info, scopes=_SCOPES)
+    except Exception:
+        return Credentials.from_service_account_file(
+            "verdant-branch-474621-d7-f60501841517.json",  # tu archivo local
+            scopes=_SCOPES
+        )
+
+# cliente gspread autorizado
+_GC = gspread.authorize(get_gcp_creds())
 
 # ---------- Funciones auxiliares ----------
 def fmt_cop(valor):
