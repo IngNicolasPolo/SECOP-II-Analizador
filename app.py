@@ -17,7 +17,7 @@ from google.oauth2.service_account import Credentials
 st.set_page_config(page_title="Analizador SECOP - COP", layout="wide")
 
 # ---------- Parámetros Looker/Sheets ----------
-SPREADSHEET_ID = "1wpvS2y8jBB4mKurj_EtMh6t5WZFrnAfT4lA_LbRNQQ"  # <<< AQUI: ID de tu hoja
+SPREADSHEET_ID = "1kERAeC2fW16gRIVPkZHrzmq8qE0887Zk0XKjqH_EtS4"  # <<< AQUI: ID de tu hoja
 SHEET_NAME = "Hoja 1"                                            # <<< AQUI: nombre de la pestaña
 
 _SCOPES = [
