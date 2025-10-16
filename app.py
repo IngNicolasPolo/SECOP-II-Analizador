@@ -281,9 +281,9 @@ if not df_view.empty:
                          file_name="secop_filtrado.xlsx",
                          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-# ---------- Publicar a GitHub y abrir Power BI ----------
+# ---------- Publicar dataset para Power BI (vía GitHub) ----------
 st.markdown("---")
-st.subheader("🚀 Publicar dataset en GitHub y abrir Power BI")
+st.subheader("🚀 Enviar dataset filtrado a Power BI")
 
 target_df = df_view if not df_view.empty else df_f.copy()
 
@@ -291,18 +291,20 @@ def upload_csv_to_github(df: pd.DataFrame) -> bool:
     try:
         owner = st.secrets["github_repo_owner"]
         repo  = st.secrets["github_repo_name"]
-        path  = st.secrets["github_file_path"]
+        path  = st.secrets["github_file_path"]   # ej: "data/latest.csv"
         token = st.secrets["github_token"]
     except Exception:
         st.error("⚠️ Faltan secretos de GitHub (owner, repo, path, token).")
         return False
 
+    # Normaliza fechas a ISO (yyyy-mm-dd) para que Power BI las lea bien
     for col in df.columns:
         if "fecha" in col.lower():
             df[col] = pd.to_datetime(df[col], errors="coerce").dt.strftime("%Y-%m-%d")
 
     api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
 
+    # Si el archivo existe, obtén su SHA para actualizarlo
     sha = None
     r_get = requests.get(api_url, headers={"Authorization": f"token {token}"})
     if r_get.status_code == 200:
@@ -319,32 +321,33 @@ def upload_csv_to_github(df: pd.DataFrame) -> bool:
     if sha:
         payload["sha"] = sha
 
-    r_put = requests.put(api_url,
-                         headers={"Authorization": f"token {token}",
-                                  "Accept": "application/vnd.github+json"},
-                         data=json.dumps(payload))
+    r_put = requests.put(
+        api_url,
+        headers={"Authorization": f"token {token}", "Accept": "application/vnd.github+json"},
+        data=json.dumps(payload)
+    )
     if r_put.status_code in (200, 201):
         return True
     else:
         st.error(f"Error al subir a GitHub: {r_put.status_code} - {r_put.text}")
         return False
 
-def open_powerbi():
+def show_powerbi_button():
     try:
         url = st.secrets["powerbi_public_url"]
-        st.link_button("🌐 Abrir dashboard en Power BI", url, use_container_width=True)
+        st.link_button("📊 Abrir dashboard en Power BI", url, use_container_width=True)
     except Exception:
-        st.warning("Configura 'powerbi_public_url' en Secrets para habilitar el enlace.")
+        st.warning("Configura 'powerbi_public_url' en Secrets para habilitar el enlace al reporte.")
 
 col1_pb, col2_pb = st.columns(2)
 
 if target_df is None or target_df.empty:
-    st.info("No hay datos para publicar. Aplica filtros o selecciona columnas.")
+    st.info("No hay datos para publicar. Aplica filtros o selecciona columnas arriba.")
 else:
-    if col1_pb.button("📤 Actualizar dataset en GitHub (CSV)"):
+    if col1_pb.button("📤 Actualizar dataset (CSV) para Power BI"):
         ok = upload_csv_to_github(target_df)
         if ok:
-            st.success("✅ Dataset publicado correctamente en GitHub.")
-            open_powerbi()
+            st.success("✅ Dataset publicado correctamente (GitHub → Power BI).")
+            show_powerbi_button()
     with col2_pb:
-        open_powerbi()
+        show_powerbi_button()
