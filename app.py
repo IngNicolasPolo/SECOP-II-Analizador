@@ -35,22 +35,21 @@ _SCOPES = [
 ]
 
 def get_gcp_creds():
-    """
-    En Streamlit Cloud usa st.secrets['gcp_service_account'].
-    En local, si quieres, puede usar el archivo .json (opcional).
-    """
     if "gcp_service_account" in st.secrets:
         info = dict(st.secrets["gcp_service_account"])
-        # Arregla saltos de línea en la private_key si vienen como \n
-        if "private_key" in info:
-            info["private_key"] = info["private_key"].replace("\\n", "\n")
+        pk = info.get("private_key", "")
+        if "\\n" in pk:      # por si usas Opción B
+            pk = pk.replace("\\n", "\n")
+        if "\r\n" in pk:     # por si hay CRLF
+            pk = pk.replace("\r\n", "\n")
+        info["private_key"] = pk
         return Credentials.from_service_account_info(info, scopes=_SCOPES)
     else:
-        # ← Opcional: solo para ejecutar en tu PC local.
         return Credentials.from_service_account_file(
             "verdant-branch-474621-d7-f60501841517.json",
             scopes=_SCOPES,
         )
+
 
 _GC = gspread.authorize(get_gcp_creds())
 
