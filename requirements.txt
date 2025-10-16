@@ -1,10 +1,6 @@
 streamlit>=1.36
 pandas>=2.0
-plotly>=5.20
-gspread>=6.0
-google-auth>=2.29
-google-auth-oauthlib>=1.2
-google-auth-httplib2>=0.2
+openpyxl>=3.1
 xlsxwriter>=3.2
-openpyxl>=3.1.2
-xlrd==2.0.1
+requests>=2.31
+GitHub

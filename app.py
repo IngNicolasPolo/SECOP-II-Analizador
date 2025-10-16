@@ -1,59 +1,18 @@
 # ---------- Imports ----------
-import io
 import re
 import unicodedata
 from datetime import datetime
-
+import io
+import base64
+import json
 import pandas as pd
-import plotly.express as px
 import streamlit as st
-
-# Google Sheets
-import os
-import gspread
-from google.oauth2.service_account import Credentials
-
+import requests
 
 # ---------- Config ----------
 st.set_page_config(page_title="Analizador SECOP - COP", layout="wide")
 
-# ---------- Parámetros para Looker / Google Sheets ----------
-SPREADSHEET_ID = "1kERAeC2fW16gRIVPkZHrzmq8qE0887Zk0XKjqH_EtS4"  # <-- PON AQUÍ TU ID DE HOJA
-SHEET_NAME = "Hoja 1"  # nombre de la pestaña en tu Sheets
-
-_SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
-
-
-# ---------- Credenciales Google (robusto y visible) ----------
-def get_gcp_creds():
-    """Obtiene credenciales desde Secrets (Cloud) o .json local (solo desarrollo)."""
-    if hasattr(st, "secrets") and "gcp_service_account" in st.secrets:
-        info = dict(st.secrets["gcp_service_account"])
-        pk = info.get("private_key", "")
-        # normaliza saltos \n o CRLF
-        if "\\n" in pk:
-            pk = pk.replace("\\n", "\n")
-        if "\r\n" in pk:
-            pk = pk.replace("\r\n", "\n")
-        info["private_key"] = pk
-        st.sidebar.success("🔐 Credenciales: usando *Secrets* de Streamlit")
-        return Credentials.from_service_account_info(info, scopes=_SCOPES)
-
-    json_path = "verdant-branch-474621-d7-f60501841517.json"  # opcional: solo local
-    if os.path.exists(json_path):
-        st.sidebar.warning("🧪 Credenciales: usando archivo .json local")
-        return Credentials.from_service_account_file(json_path, scopes=_SCOPES)
-
-    st.sidebar.error("❌ No hay credenciales: agrega *Secrets* o el .json local")
-    raise RuntimeError("No se encontraron credenciales (ni secrets ni archivo .json)")
-
-_GC = gspread.authorize(get_gcp_creds())
-
-
-# ---------- Auxiliares ----------
+# ---------- Utilidades ----------
 def fmt_cop(valor):
     try:
         if pd.isna(valor):
@@ -62,7 +21,6 @@ def fmt_cop(valor):
     except Exception:
         return "$0 COP"
 
-
 def normalizar_texto(s: str) -> str:
     if pd.isna(s):
         return ""
@@ -70,7 +28,6 @@ def normalizar_texto(s: str) -> str:
     s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
     s = re.sub(r"\s+", " ", s)
     return s
-
 
 def parse_fecha(x):
     if pd.isna(x) or str(x).strip() == "":
@@ -81,7 +38,6 @@ def parse_fecha(x):
         except Exception:
             continue
     return pd.to_datetime(x, errors="coerce")
-
 
 def to_number(x):
     if pd.isna(x):
@@ -94,44 +50,42 @@ def to_number(x):
     except Exception:
         return 0.0
 
-
-# ---------- Mapeo flexible de columnas ----------
+# ---------- Mapeo flexible ----------
 COLUMN_MAP = {
     "entidad": [
-        "Entidad", "entidad", "nombre_entidad", "entidad contratante", "nombre de la entidad",
-        "entidad_estatal", "buyer", "buyername"
+        "Entidad","entidad","nombre_entidad","entidad contratante","nombre de la entidad",
+        "entidad_estatal","buyer","buyername"
     ],
     "proveedor": [
-        "Nombre del Proveedor Adjudicado", "Proveedor", "Contratista", "nombre_proveedor",
-        "supplier", "nombre del contratista"
+        "Nombre del Proveedor Adjudicado","Proveedor","Contratista","nombre_proveedor",
+        "supplier","nombre del contratista"
     ],
     "nit_proveedor": [
-        "NIT del Proveedor Adjudicado", "nit proveedor", "supplier_id", "nit", "identificacion proveedor"
+        "NIT del Proveedor Adjudicado","nit proveedor","supplier_id","nit","identificacion proveedor"
     ],
     "objeto": [
-        "Descripción del Procedimiento", "Objeto", "objeto del contrato", "descripcion", "description"
+        "Descripción del Procedimiento","Objeto","objeto del contrato","descripcion","description"
     ],
     "tipo_contrato": [
-        "Tipo de Contrato", "tipo de contrato", "modalidad", "tipocontrato",
-        "modalidad de contratacion", "contracttype"
+        "Tipo de Contrato","tipo de contrato","modalidad","tipocontrato",
+        "modalidad de contratacion","contracttype"
     ],
     "valor": [
-        "Valor Total Adjudicacion", "Valor del contrato", "valor", "valor total",
-        "monto", "amount", "valor adjudicado", "valor_contrato", "Precio Base"
+        "Valor Total Adjudicacion","Valor del contrato","valor","valor total",
+        "monto","amount","valor adjudicado","valor_contrato","Precio Base"
     ],
     "fecha": [
-        "Fecha Adjudicacion", "Fecha de Publicacion del Proceso", "Fecha de Ultima Publicación",
-        "fecha", "publicationdate", "awarddate", "fecha publicacion"
+        "Fecha Adjudicacion","Fecha de Publicacion del Proceso","Fecha de Ultima Publicación",
+        "fecha","publicationdate","awarddate","fecha publicacion"
     ],
     "departamento": [
-        "Departamento Entidad", "departamento", "region", "ubicacion", "departamento_ejecucion"
+        "Departamento Entidad","departamento","region","ubicacion","departamento_ejecucion"
     ],
     "codigo_proceso": [
-        "ID del Proceso", "codigo de proceso", "proceso", "processid",
-        "id_proceso", "id proceso", "codigo_proceso"
+        "ID del Proceso","codigo de proceso","proceso","processid",
+        "id_proceso","id proceso","codigo_proceso"
     ],
 }
-
 
 def encontrar_columna(df, candidatos):
     cols_norm = {normalizar_texto(c): c for c in df.columns}
@@ -139,12 +93,10 @@ def encontrar_columna(df, candidatos):
         key = normalizar_texto(cand)
         if key in cols_norm:
             return cols_norm[key]
-    # heurística simple
     for c in df.columns:
         if any(normalizar_texto(x) in normalizar_texto(c) for x in candidatos):
             return c
     return None
-
 
 def estandarizar_columnas(df: pd.DataFrame) -> pd.DataFrame:
     mapping = {}
@@ -154,14 +106,13 @@ def estandarizar_columnas(df: pd.DataFrame) -> pd.DataFrame:
             mapping[real] = interno
     return df.rename(columns=mapping).copy()
 
-
-# ---------- Limpieza ----------
+# ---------- Limpieza principal ----------
 @st.cache_data(show_spinner=False)
 def limpiar(df: pd.DataFrame) -> pd.DataFrame:
     df = estandarizar_columnas(df)
 
-    for c in ["entidad", "proveedor", "objeto", "tipo_contrato", "valor", "fecha",
-              "departamento", "codigo_proceso", "nit_proveedor"]:
+    for c in ["entidad","proveedor","objeto","tipo_contrato","valor","fecha",
+              "departamento","codigo_proceso","nit_proveedor"]:
         if c not in df.columns:
             df[c] = pd.NA
 
@@ -176,7 +127,7 @@ def limpiar(df: pd.DataFrame) -> pd.DataFrame:
     df["anio"] = df["fecha"].dt.year
     df["mes"] = df["fecha"].dt.month
 
-    subset = [c for c in ["codigo_proceso", "proveedor", "valor", "fecha"] if c in df.columns]
+    subset = [c for c in ["codigo_proceso","proveedor","valor","fecha"] if c in df.columns]
     if subset:
         df = df.drop_duplicates(subset=subset, keep="first")
 
@@ -184,14 +135,13 @@ def limpiar(df: pd.DataFrame) -> pd.DataFrame:
     df["valor"] = df["valor"].round(0)
     return df
 
-
 # ---------- App ----------
-st.title("🔎 Prototipo: ETL + Análisis básico de SECOP (COP)")
-archivo = st.file_uploader("Sube un archivo SECOP (.csv / .xlsx)", type=["csv", "xlsx"])
+st.title("🔎 Análisis de Contratación Pública - SECOP I y II")
+
+archivo = st.file_uploader("📂 Sube un archivo SECOP (.csv / .xlsx)", type=["csv","xlsx"])
 if archivo is None:
     st.info("Sube un archivo para comenzar.")
     st.stop()
-
 
 @st.cache_data(show_spinner=False)
 def read_any(file) -> pd.DataFrame:
@@ -207,13 +157,13 @@ def read_any(file) -> pd.DataFrame:
 
 df_raw = read_any(archivo)
 
-st.subheader("Vista previa (crudo)")
+st.subheader("📊 Vista previa de los datos sin limpiar")
 st.dataframe(df_raw.head(20), use_container_width=True)
 
 # ---------- ETL ----------
 df = limpiar(df_raw)
 
-# ---------- Filtros ----------
+# ---------- Filtros (sidebar) ----------
 with st.sidebar:
     st.header("Filtros")
 
@@ -279,8 +229,9 @@ col3.metric("Proveedores únicos", f"{proveedores_unicos:,}".replace(",", "."))
 
 st.markdown("---")
 
-# ---------- Selector de columnas ----------
-st.subheader("Datos limpios (muestra)")
+# ---------- Tabla configurable ----------
+st.subheader("🧾 Datos limpios (selecciona columnas)")
+
 friendly_cols = {
     "entidad": "Entidad",
     "nit_proveedor": "NIT Proveedor",
@@ -297,9 +248,9 @@ friendly_cols = {
 available_internal = [c for c in friendly_cols.keys() if c in df_f.columns]
 plantilla = st.radio("Plantilla de columnas", ["Básico", "Detallado", "Personalizado"], horizontal=True)
 tpl_basico = [c for c in ["entidad", "proveedor", "valor", "fecha", "anio"] if c in available_internal]
-tpl_detallado = [c for c in ["entidad", "nit_proveedor", "proveedor", "departamento",
-                             "tipo_contrato", "valor", "fecha", "anio", "mes",
-                             "codigo_proceso", "objeto"] if c in available_internal]
+tpl_detallado = [c for c in ["entidad","nit_proveedor","proveedor","departamento",
+                             "tipo_contrato","valor","fecha","anio","mes",
+                             "codigo_proceso","objeto"] if c in available_internal]
 pre_sel = tpl_basico if plantilla == "Básico" else tpl_detallado
 cols_sel = st.multiselect(
     "Elige las columnas a mostrar/descargar",
@@ -308,109 +259,92 @@ cols_sel = st.multiselect(
 )
 if cols_sel:
     df_view = df_f[cols_sel].rename(columns=friendly_cols).copy()
-    if "Valor (COP)" in df_view.columns:
-        df_view["Valor (COP) (formateado)"] = df_view["Valor (COP)"].apply(fmt_cop)
 else:
     st.info("Selecciona al menos una columna para ver la tabla.")
     df_view = pd.DataFrame()
 
 st.dataframe(df_view.head(20), use_container_width=True)
 
-# ---------- Gráfico 1: Evolución temporal ----------
-if "fecha" in df_f.columns and df_f["fecha"].notna().any():
-    serie = df_f.dropna(subset=["fecha"]).copy()
-    serie["periodo"] = pd.to_datetime(serie["fecha"]).dt.to_period("M").dt.to_timestamp()
-    g1 = (serie.groupby("periodo", as_index=False)["valor"].sum().sort_values("periodo"))
-    fig1 = px.line(g1, x="periodo", y="valor", markers=True,
-                   title="Evolución del monto contratado (COP)",
-                   labels={"periodo": "Periodo", "valor": "Pesos (COP)"})
-    fig1.update_layout(yaxis_tickformat=",")
-    st.plotly_chart(fig1, use_container_width=True)
-else:
-    st.info("No se encontraron columnas de fecha/valor para graficar la evolución.")
-
-# ---------- Gráfico 2: Top 10 proveedores ----------
-if "proveedor" in df_f.columns and "valor" in df_f.columns and not df_f.empty:
-    top_prov = (df_f.groupby("proveedor", as_index=False)["valor"]
-                .sum().sort_values("valor", ascending=False).head(10))
-    fig2 = px.bar(top_prov, x="proveedor", y="valor",
-                  title="Top 10 proveedores por monto (COP)",
-                  labels={"proveedor": "Proveedor", "valor": "Pesos (COP)"})
-    fig2.update_layout(xaxis=dict(tickangle=-45), yaxis_tickformat=",")
-    st.plotly_chart(fig2, use_container_width=True)
-else:
-    st.info("No se encontraron columnas de proveedor/valor.")
-
+# ---------- Descargas locales ----------
 st.markdown("---")
-
-# ---------- Descargas ----------
 colA, colB = st.columns(2)
 if not df_view.empty:
     csv_bytes = df_view.to_csv(index=False).encode("utf-8")
     colA.download_button("📥 Descargar (CSV)", data=csv_bytes,
-                         file_name="secop_limpio.csv", mime="text/csv")
+                         file_name="secop_filtrado.csv", mime="text/csv")
+
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-        df_view.to_excel(writer, index=False, sheet_name="DatosLimpios")
-    colB.download_button("📥 Descargar (Excel)", data=buffer.getvalue(),
-                         file_name="secop_limpio.xlsx",
+        df_view.to_excel(writer, index=False, sheet_name="DatosFiltrados")
+    colB.download_button("📥 Descargar (Excel)",
+                         data=buffer.getvalue(),
+                         file_name="secop_filtrado.xlsx",
                          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-else:
-    st.info("No hay datos para descargar con la selección actual.")
 
-# ---------- Publicar en Google Sheets (para Looker) ----------
+# ---------- Publicar a GitHub y abrir Power BI ----------
 st.markdown("---")
-st.subheader("📡 Publicar datos al dashboard (Looker Studio)")
+st.subheader("🚀 Publicar dataset en GitHub y abrir Power BI")
 
-target_df = df_view if not df_view.empty else df_f
+target_df = df_view if not df_view.empty else df_f.copy()
 
-def publicar_df_en_sheets(df):
-    if df is None or df.empty:
-        st.warning("No hay datos para publicar.")
-        return False
-    df2 = df.copy()
-
-    # Si viene con nombres "bonitos", remapea a internos (opcional)
-    if "Fecha del Proceso" in df2.columns:
-        df2 = df2.rename(columns={
-            "Entidad": "entidad",
-            "NIT Proveedor": "nit_proveedor",
-            "Proveedor": "proveedor",
-            "Departamento": "departamento",
-            "Tipo de Contrato": "tipo_contrato",
-            "Valor (COP)": "valor",
-            "Fecha del Proceso": "fecha",
-            "Año": "anio",
-            "Mes": "mes",
-            "ID / Código del Proceso": "codigo_proceso",
-            "Objeto / Descripción": "objeto",
-        })
-
-    if "fecha" in df2.columns:
-        df2["fecha"] = pd.to_datetime(df2["fecha"], errors="coerce").dt.strftime("%Y-%m-%d")
-
+def upload_csv_to_github(df: pd.DataFrame) -> bool:
     try:
-        sh = _GC.open_by_key(SPREADSHEET_ID)
-        try:
-            ws = sh.worksheet(SHEET_NAME)
-        except gspread.WorksheetNotFound:
-            ws = sh.add_worksheet(title=SHEET_NAME, rows=100, cols=26)
-
-        ws.clear()
-
-        rows = [df2.columns.tolist()] + df2.fillna("").astype(object).values.tolist()
-        ws.update("A1", [rows[0]])
-        chunk = 2000
-        for i in range(1, len(rows), chunk):
-            ws.update(f"A{i+1}", rows[i:i+chunk], value_input_option="RAW")
-        return True
-    except Exception as e:
-        st.error(f"Error publicando en Google Sheets: {e}")
+        owner = st.secrets["github_repo_owner"]
+        repo  = st.secrets["github_repo_name"]
+        path  = st.secrets["github_file_path"]
+        token = st.secrets["github_token"]
+    except Exception:
+        st.error("⚠️ Faltan secretos de GitHub (owner, repo, path, token).")
         return False
 
-if st.button("Actualizar dashboard con estos datos"):
-    ok = publicar_df_en_sheets(target_df)
-    if ok:
-        st.success("✅ Datos publicados en Google Sheets. Refresca tu reporte de Looker Studio.")
+    for col in df.columns:
+        if "fecha" in col.lower():
+            df[col] = pd.to_datetime(df[col], errors="coerce").dt.strftime("%Y-%m-%d")
+
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+
+    sha = None
+    r_get = requests.get(api_url, headers={"Authorization": f"token {token}"})
+    if r_get.status_code == 200:
+        sha = r_get.json().get("sha", None)
+
+    csv_bytes = df.to_csv(index=False).encode("utf-8")
+    b64_content = base64.b64encode(csv_bytes).decode("utf-8")
+
+    payload = {
+        "message": f"Update dataset from Streamlit ({datetime.now().isoformat(timespec='seconds')})",
+        "content": b64_content,
+        "branch": "main"
+    }
+    if sha:
+        payload["sha"] = sha
+
+    r_put = requests.put(api_url,
+                         headers={"Authorization": f"token {token}",
+                                  "Accept": "application/vnd.github+json"},
+                         data=json.dumps(payload))
+    if r_put.status_code in (200, 201):
+        return True
     else:
-        st.error("❌ No se pudieron publicar los datos.")
+        st.error(f"Error al subir a GitHub: {r_put.status_code} - {r_put.text}")
+        return False
+
+def open_powerbi():
+    try:
+        url = st.secrets["powerbi_public_url"]
+        st.link_button("🌐 Abrir dashboard en Power BI", url, use_container_width=True)
+    except Exception:
+        st.warning("Configura 'powerbi_public_url' en Secrets para habilitar el enlace.")
+
+col1_pb, col2_pb = st.columns(2)
+
+if target_df is None or target_df.empty:
+    st.info("No hay datos para publicar. Aplica filtros o selecciona columnas.")
+else:
+    if col1_pb.button("📤 Actualizar dataset en GitHub (CSV)"):
+        ok = upload_csv_to_github(target_df)
+        if ok:
+            st.success("✅ Dataset publicado correctamente en GitHub.")
+            open_powerbi()
+    with col2_pb:
+        open_powerbi()
