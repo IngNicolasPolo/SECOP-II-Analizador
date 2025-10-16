@@ -35,20 +35,26 @@ _SCOPES = [
 ]
 
 def get_gcp_creds():
-    if "gcp_service_account" in st.secrets:
-        info = dict(st.secrets["gcp_service_account"])
+    # 1) Intenta SIEMPRE leer de secrets (Cloud)
+    try:
+        info = st.secrets["gcp_service_account"]     # Key exacta en Settings → Secrets
+        info = dict(info)
         pk = info.get("private_key", "")
-        if "\\n" in pk:      # por si usas Opción B
+        # normaliza saltos por si usaste formato con \n o CRLF
+        if "\\n" in pk:
             pk = pk.replace("\\n", "\n")
-        if "\r\n" in pk:     # por si hay CRLF
+        if "\r\n" in pk:
             pk = pk.replace("\r\n", "\n")
         info["private_key"] = pk
         return Credentials.from_service_account_info(info, scopes=_SCOPES)
-    else:
+    except Exception as e:
+        # 2) Fallback SOLO para correr en tu PC local con el archivo .json
         return Credentials.from_service_account_file(
             "verdant-branch-474621-d7-f60501841517.json",
             scopes=_SCOPES,
         )
+
+_GC = gspread.authorize(get_gcp_creds())
 
 
 _GC = gspread.authorize(get_gcp_creds())
