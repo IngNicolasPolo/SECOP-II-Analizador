@@ -1,14 +1,15 @@
 # ---------- Imports ----------
+import io
 import re
 import unicodedata
 from datetime import datetime
-import io
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# --- Integración Google Sheets (para Looker Studio) ---
+# Google Sheets
+import os
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -16,54 +17,43 @@ from google.oauth2.service_account import Credentials
 # ---------- Config ----------
 st.set_page_config(page_title="Analizador SECOP - COP", layout="wide")
 
-# ---------- Parámetros Looker/Sheets ----------
-SPREADSHEET_ID = "1kERAeC2fW16gRIVPkZHrzmq8qE0887Zk0XKjqH_EtS4"  # <<< AQUI: ID de tu hoja
-SHEET_NAME = "Hoja 1"                                            # <<< AQUI: nombre de la pestaña
+# ---------- Parámetros para Looker / Google Sheets ----------
+SPREADSHEET_ID = "1kERAeC2fW16gRIVPkZHrzmq8qE0887Zk0XKjqH_EtS4"  # <-- PON AQUÍ TU ID DE HOJA
+SHEET_NAME = "Hoja 1"  # nombre de la pestaña en tu Sheets
 
 _SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
 
-import gspread
-from google.oauth2.service_account import Credentials
-import streamlit as st
 
-_SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
-
+# ---------- Credenciales Google (robusto y visible) ----------
 def get_gcp_creds():
-    # 1) Intenta SIEMPRE leer de secrets (Cloud)
-    try:
-        info = st.secrets["gcp_service_account"]     # Key exacta en Settings → Secrets
-        info = dict(info)
+    """Obtiene credenciales desde Secrets (Cloud) o .json local (solo desarrollo)."""
+    if hasattr(st, "secrets") and "gcp_service_account" in st.secrets:
+        info = dict(st.secrets["gcp_service_account"])
         pk = info.get("private_key", "")
-        # normaliza saltos por si usaste formato con \n o CRLF
+        # normaliza saltos \n o CRLF
         if "\\n" in pk:
             pk = pk.replace("\\n", "\n")
         if "\r\n" in pk:
             pk = pk.replace("\r\n", "\n")
         info["private_key"] = pk
+        st.sidebar.success("🔐 Credenciales: usando *Secrets* de Streamlit")
         return Credentials.from_service_account_info(info, scopes=_SCOPES)
-    except Exception as e:
-        # 2) Fallback SOLO para correr en tu PC local con el archivo .json
-        return Credentials.from_service_account_file(
-            "verdant-branch-474621-d7-f60501841517.json",
-            scopes=_SCOPES,
-        )
+
+    json_path = "verdant-branch-474621-d7-f60501841517.json"  # opcional: solo local
+    if os.path.exists(json_path):
+        st.sidebar.warning("🧪 Credenciales: usando archivo .json local")
+        return Credentials.from_service_account_file(json_path, scopes=_SCOPES)
+
+    st.sidebar.error("❌ No hay credenciales: agrega *Secrets* o el .json local")
+    raise RuntimeError("No se encontraron credenciales (ni secrets ni archivo .json)")
 
 _GC = gspread.authorize(get_gcp_creds())
 
 
-_GC = gspread.authorize(get_gcp_creds())
-
-
-# cliente gspread autorizado
-_GC = gspread.authorize(get_gcp_creds())
-
-# ---------- Funciones auxiliares ----------
+# ---------- Auxiliares ----------
 def fmt_cop(valor):
     try:
         if pd.isna(valor):
@@ -149,6 +139,7 @@ def encontrar_columna(df, candidatos):
         key = normalizar_texto(cand)
         if key in cols_norm:
             return cols_norm[key]
+    # heurística simple
     for c in df.columns:
         if any(normalizar_texto(x) in normalizar_texto(c) for x in candidatos):
             return c
@@ -164,7 +155,7 @@ def estandarizar_columnas(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns=mapping).copy()
 
 
-# ---------- ETL Limpieza ----------
+# ---------- Limpieza ----------
 @st.cache_data(show_spinner=False)
 def limpiar(df: pd.DataFrame) -> pd.DataFrame:
     df = estandarizar_columnas(df)
@@ -214,17 +205,18 @@ def read_any(file) -> pd.DataFrame:
     else:
         return pd.read_excel(file)
 
-
 df_raw = read_any(archivo)
+
 st.subheader("Vista previa (crudo)")
 st.dataframe(df_raw.head(20), use_container_width=True)
 
 # ---------- ETL ----------
 df = limpiar(df_raw)
 
-# ---------- Filtros (sidebar) ----------
+# ---------- Filtros ----------
 with st.sidebar:
     st.header("Filtros")
+
     if "anio" in df.columns and df["anio"].notna().any():
         min_anio = int(df["anio"].min())
         max_anio = int(df["anio"].max())
@@ -377,8 +369,8 @@ def publicar_df_en_sheets(df):
         st.warning("No hay datos para publicar.")
         return False
     df2 = df.copy()
-    # si viene con nombres 'bonitos', mapea de nuevo a internos para consistencia opcional
-    # (puedes omitir esta parte si tu Looker trabaja con los nombres bonitos)
+
+    # Si viene con nombres "bonitos", remapea a internos (opcional)
     if "Fecha del Proceso" in df2.columns:
         df2 = df2.rename(columns={
             "Entidad": "entidad",
@@ -393,6 +385,7 @@ def publicar_df_en_sheets(df):
             "ID / Código del Proceso": "codigo_proceso",
             "Objeto / Descripción": "objeto",
         })
+
     if "fecha" in df2.columns:
         df2["fecha"] = pd.to_datetime(df2["fecha"], errors="coerce").dt.strftime("%Y-%m-%d")
 
@@ -402,6 +395,7 @@ def publicar_df_en_sheets(df):
             ws = sh.worksheet(SHEET_NAME)
         except gspread.WorksheetNotFound:
             ws = sh.add_worksheet(title=SHEET_NAME, rows=100, cols=26)
+
         ws.clear()
 
         rows = [df2.columns.tolist()] + df2.fillna("").astype(object).values.tolist()
@@ -420,9 +414,3 @@ if st.button("Actualizar dashboard con estos datos"):
         st.success("✅ Datos publicados en Google Sheets. Refresca tu reporte de Looker Studio.")
     else:
         st.error("❌ No se pudieron publicar los datos.")
-
-# (Opcional) embeber Looker cuando tengas el iframe:
-# st.markdown("## 📊 Dashboard interactivo (Looker Studio)")
-# looker_url = "https://lookerstudio.google.com/embed/reporting/TU_ENLACE_AQUI"
-# st.markdown(f'<iframe width="100%" height="850" src="{looker_url}" frameborder="0" style="border:0" allowfullscreen></iframe>',
-#             unsafe_allow_html=True)
