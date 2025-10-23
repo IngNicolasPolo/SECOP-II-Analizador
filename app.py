@@ -273,13 +273,174 @@ if not df_view.empty:
     colA.download_button("📥 Descargar (CSV)", data=csv_bytes,
                          file_name="secop_filtrado.csv", mime="text/csv")
 
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+    buffer_xlsx = io.BytesIO()
+    with pd.ExcelWriter(buffer_xlsx, engine="xlsxwriter") as writer:
         df_view.to_excel(writer, index=False, sheet_name="DatosFiltrados")
     colB.download_button("📥 Descargar (Excel)",
-                         data=buffer.getvalue(),
+                         data=buffer_xlsx.getvalue(),
                          file_name="secop_filtrado.xlsx",
                          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+# ---------- NUEVO: Reporte con gráficos (Excel) ----------
+st.markdown("### 📈 Reporte visual listo para entregar (Excel con gráficos)")
+
+def build_excel_report(df_filtered: pd.DataFrame, df_internal_full: pd.DataFrame) -> bytes:
+    """
+    Crea un Excel con:
+      - Hoja KPIs
+      - Hoja Tablas (df_filtered)
+      - Hoja Gráficos: Top Entidades, Valor por Año, Por Tipo de Contrato
+    Si df_filtered está vacío, cae al dataset interno filtrado (df_internal_full) con columnas estándar.
+    """
+    # Dataset base para gráficos (usar interno si el view está vacío)
+    if df_filtered is None or df_filtered.empty:
+        base = df_internal_full.copy()
+        # Renombrar a etiquetas amigables si hace falta
+        rename = {
+            "entidad": "Entidad",
+            "proveedor": "Proveedor",
+            "tipo_contrato": "Tipo de Contrato",
+            "valor": "Valor (COP)",
+            "anio": "Año"
+        }
+        base = base.rename(columns=rename)
+    else:
+        base = df_filtered.copy()
+
+    # Garantizar columnas clave
+    col_ent = next((c for c in base.columns if c.lower() == "entidad"), "Entidad")
+    col_val = next((c for c in base.columns if "valor" in c.lower()), "Valor (COP)")
+    col_anio = next((c for c in base.columns if "año" in c.lower() or "anio" in c.lower()), "Año")
+    col_tipo = next((c for c in base.columns if "tipo" in c.lower()), "Tipo de Contrato")
+    col_prov = next((c for c in base.columns if "proveedor" in c.lower()), "Proveedor")
+
+    # Agregados
+    top_ent = (base.groupby(col_ent, dropna=True)[col_val]
+               .sum().sort_values(ascending=False).head(10).reset_index())
+    by_year = (base.dropna(subset=[col_anio])
+               .groupby(col_anio, dropna=True)[col_val]
+               .sum().reset_index().sort_values(col_anio))
+    by_tipo = (base.groupby(col_tipo, dropna=True)[col_val]
+               .sum().sort_values(ascending=False).reset_index())
+
+    total_contratos = len(base)
+    total_valor = float(base[col_val].sum()) if col_val in base else 0.0
+    proveedores_unicos = base[col_prov].nunique() if col_prov in base else 0
+
+    # Construir Excel
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        wb = writer.book
+
+        # Formatos
+        fmt_title = wb.add_format({"bold": True, "font_size": 14})
+        fmt_sub = wb.add_format({"bold": True, "font_size": 11})
+        fmt_money = wb.add_format({"num_format": '#,##0" COP"'})
+        fmt_int = wb.add_format({"num_format": '#,##0'})
+        fmt_text = wb.add_format({"text_wrap": True})
+
+        # --- Hoja KPIs ---
+        ws_kpi = wb.add_worksheet("KPIs")
+        ws_kpi.write("A1", "Resumen de Indicadores", fmt_title)
+        ws_kpi.write("A3", "Contratos")
+        ws_kpi.write_number("B3", total_contratos, fmt_int)
+        ws_kpi.write("A4", "Valor Total (COP)")
+        ws_kpi.write_number("B4", total_valor, fmt_money)
+        ws_kpi.write("A5", "Proveedores Únicos")
+        ws_kpi.write_number("B5", proveedores_unicos, fmt_int)
+        ws_kpi.set_column("A:A", 25)
+        ws_kpi.set_column("B:B", 25)
+
+        # --- Hoja Tablas ---
+        ws_tbl_name = "Tablas"
+        base.to_excel(writer, sheet_name=ws_tbl_name, index=False)
+        ws_tbl = writer.sheets[ws_tbl_name]
+        for idx, col in enumerate(base.columns):
+            ws_tbl.set_column(idx, idx, min(max(len(str(col)) + 2, 12), 45))
+
+        # Rango base para gráficos (usaremos las tablas agregadas)
+        row_offset = 2
+
+        # --- Hoja Gráficos ---
+        ws_cht = wb.add_worksheet("Gráficos")
+        ws_cht.write("A1", "Reporte Visual SECOP", fmt_title)
+
+        # 1) Top 10 Entidades por Valor (Barras)
+        ws_cht.write("A3", "Top 10 Entidades por Valor (COP)", fmt_sub)
+        start_top = 4
+        ws_cht.write_row(start_top, 0, [col_ent, "Valor (COP)"], fmt_sub)
+        for i, r in enumerate(top_ent.itertuples(index=False), start=start_top+1):
+            ws_cht.write(i, 0, r[0])  # entidad
+            ws_cht.write_number(i, 1, float(r[1]), fmt_money)
+
+        chart1 = wb.add_chart({"type": "bar"})
+        end_row_top = start_top + 1 + len(top_ent)
+        chart1.add_series({
+            "name": "Valor (COP)",
+            "categories": f"=Gráficos!$A${start_top+2}:$A${end_row_top}",
+            "values": f"=Gráficos!$B${start_top+2}:$B${end_row_top}",
+            "data_labels": {"value": True},
+        })
+        chart1.set_legend({"none": True})
+        chart1.set_title({"name": "Top 10 Entidades por Valor"})
+        ws_cht.insert_chart("D4", chart1, {"x_scale": 1.2, "y_scale": 1.3})
+
+        # 2) Valor por Año (Columnas)
+        ws_cht.write("A20", "Valor por Año (COP)", fmt_sub)
+        start_year = 21
+        ws_cht.write_row(start_year, 0, [col_anio, "Valor (COP)"], fmt_sub)
+        for i, r in enumerate(by_year.itertuples(index=False), start=start_year+1):
+            ws_cht.write(i, 0, int(r[0]))
+            ws_cht.write_number(i, 1, float(r[1]), fmt_money)
+
+        chart2 = wb.add_chart({"type": "column"})
+        end_row_year = start_year + 1 + len(by_year)
+        chart2.add_series({
+            "name": "Valor (COP)",
+            "categories": f"=Gráficos!$A${start_year+2}:$A${end_row_year}",
+            "values": f"=Gráficos!$B${start_year+2}:$B${end_row_year}",
+            "data_labels": {"value": True},
+        })
+        chart2.set_legend({"none": True})
+        chart2.set_title({"name": "Valor por Año"})
+        ws_cht.insert_chart("D21", chart2, {"x_scale": 1.2, "y_scale": 1.3})
+
+        # 3) Distribución por Tipo de Contrato (Pastel)
+        ws_cht.write("A36", "Distribución por Tipo de Contrato", fmt_sub)
+        start_tipo = 37
+        ws_cht.write_row(start_tipo, 0, [col_tipo, "Valor (COP)"], fmt_sub)
+        for i, r in enumerate(by_tipo.itertuples(index=False), start=start_tipo+1):
+            ws_cht.write(i, 0, r[0])
+            ws_cht.write_number(i, 1, float(r[1]), fmt_money)
+
+        chart3 = wb.add_chart({"type": "pie"})
+        end_row_tipo = start_tipo + 1 + len(by_tipo)
+        chart3.add_series({
+            "name": "Participación por tipo",
+            "categories": f"=Gráficos!$A${start_tipo+2}:$A${end_row_tipo}",
+            "values": f"=Gráficos!$B${start_tipo+2}:$B${end_row_tipo}",
+            "data_labels": {"percentage": True, "category": True},
+        })
+        chart3.set_title({"name": "Porcentaje por Tipo de Contrato"})
+        ws_cht.insert_chart("D37", chart3, {"x_scale": 1.2, "y_scale": 1.3})
+
+    return output.getvalue()
+
+colR1, colR2 = st.columns([1,2])
+with colR1:
+    generar = st.button("📊 Descargar Reporte con Gráficos (Excel)", use_container_width=True)
+
+if generar:
+    # Si el usuario no seleccionó columnas, usamos el df_f interno (renombrado)
+    base_interna = df.copy()
+    bytes_report = build_excel_report(df_view if not df_view.empty else None, base_interna)
+    st.download_button(
+        "📥 Guardar Reporte.xlsx",
+        data=bytes_report,
+        file_name="Reporte_SECOP_Visual.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
 
 # ---------- Publicar dataset para Power BI (vía GitHub) ----------
 st.markdown("---")
