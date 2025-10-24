@@ -157,7 +157,7 @@ with st.sidebar:
         entidad_sel = st.multiselect(
             "Selecciona entidades",
             entidades,
-            default=entidades if sel_all_ent else entidades[:10],
+            default=[],
             placeholder="Buscar/seleccionar…"
         )
     st.caption(f"{len(entidad_sel)} entidades seleccionadas")
