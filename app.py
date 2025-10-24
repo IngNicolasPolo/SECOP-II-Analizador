@@ -140,31 +140,53 @@ with st.sidebar:
     if "anio" in df.columns and df["anio"].notna().any():
         min_anio = int(df["anio"].min())
         max_anio = int(df["anio"].max())
-        anio_rango = st.slider("Rango de años", min_value=min_anio, max_value=max_anio, value=(min_anio, max_anio), step=1)
+        anio_rango = st.slider(
+            "Rango de años",
+            min_value=min_anio,
+            max_value=max_anio,
+            value=(min_anio, max_anio),
+            step=1
+        )
     else:
         anio_rango = None
 
     entidades = sorted([x for x in df["entidad"].dropna().unique()]) if "entidad" in df else []
     sel_all_ent = st.checkbox("Seleccionar todas las entidades", value=True)
-    entidad_sel = st.multiselect("Entidad", entidades, default=entidades if sel_all_ent else entidades[:10])
+
+    with st.popover("Entidad (múltiple)", use_container_width=True):
+        entidad_sel = st.multiselect(
+            "Selecciona entidades",
+            entidades,
+            default=entidades if sel_all_ent else entidades[:10],
+            placeholder="Buscar/seleccionar…"
+        )
+    st.caption(f"{len(entidad_sel)} entidades seleccionadas")
 
     with st.expander("Filtros avanzados"):
         if "departamento" in df.columns:
             deps = sorted([x for x in df["departamento"].dropna().unique()])
-            dep_sel = st.multiselect("Departamento", deps, default=[])
+            with st.popover("Departamento", use_container_width=True):
+                dep_sel = st.multiselect("Departamento", deps, default=[])
         else:
             dep_sel = []
 
         if "tipo_contrato" in df.columns:
             tipos = sorted([x for x in df["tipo_contrato"].dropna().unique()])
-            tipo_sel = st.multiselect("Tipo de contrato", tipos, default=[])
+            with st.popover("Tipo de contrato", use_container_width=True):
+                tipo_sel = st.multiselect("Tipo de contrato", tipos, default=[])
         else:
             tipo_sel = []
 
         vmin, vmax = 0.0, float(df["valor"].max()) if "valor" in df else 0.0
         if vmax is None or pd.isna(vmax):
             vmax = 0.0
-        rango_valor = st.slider("Rango de valores (COP)", min_value=float(vmin), max_value=float(vmax), value=(float(vmin), float(vmax)), step=1.0)
+        rango_valor = st.slider(
+            "Rango de valores (COP)",
+            min_value=float(vmin),
+            max_value=float(vmax),
+            value=(float(vmin), float(vmax)),
+            step=1.0
+        )
 
         term_obj = st.text_input("Buscar en objeto (palabra clave)", value="").strip().lower()
 
@@ -218,12 +240,17 @@ plantilla = st.radio("Plantilla de columnas", ["Básico", "Detallado", "Personal
 tpl_basico = [c for c in ["entidad", "proveedor", "valor", "fecha", "anio"] if c in available_internal]
 tpl_detallado = [c for c in ["entidad","nit_proveedor","proveedor","departamento","tipo_contrato","valor","fecha","anio","mes","codigo_proceso","objeto"] if c in available_internal]
 pre_sel = tpl_basico if plantilla == "Básico" else tpl_detallado
-cols_sel = st.multiselect(
-    "Elige las columnas a mostrar/descargar",
-    options=available_internal,
-    default=pre_sel,
-    format_func=lambda c: friendly_cols.get(c, c)
-)
+with st.popover("Elige las columnas a mostrar/descargar", use_container_width=True):
+    cols_sel = st.multiselect(
+        "Columnas",
+        options=available_internal,
+        default=pre_sel,
+        format_func=lambda c: friendly_cols.get(c, c),
+        placeholder="Selecciona columnas…"
+    )
+
+# Resumen compacto
+st.caption(f"{len(cols_sel)} columnas seleccionadas")
 if cols_sel:
     df_view = df_f[cols_sel].rename(columns=friendly_cols).copy()
 else:
