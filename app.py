@@ -244,7 +244,7 @@ with st.popover("Elige las columnas a mostrar/descargar", use_container_width=Tr
     cols_sel = st.multiselect(
         "Columnas",
         options=available_internal,
-        default=pre_sel,
+        default=[],
         format_func=lambda c: friendly_cols.get(c, c),
         placeholder="Selecciona columnas…"
     )
