@@ -174,8 +174,8 @@ st.markdown("""
   <div class="header-flex">
     <div class="brand">
       <div class="logo">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="#b58b00" width="22" height="22">
-          <circle cx="11" cy="11" r="7" stroke="#b58b00" stroke-width="2" fill="none"></circle>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="#1e3a8a" width="22" height="22">
+          <circle cx="11" cy="11" r="7" stroke="#1e3a8a" stroke-width="2" fill="none"></circle>
           <line x1="16.65" y1="16.65" x2="22" y2="22" stroke="#1e3a8a" stroke-width="2" stroke-linecap="round"></line>
         </svg>
       </div>
