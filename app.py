@@ -168,7 +168,7 @@ def limpiar(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ---------- App ----------
-# ---------- Header (versión profesional con SVG azul) ----------
+# ---------- Header ----------
 st.markdown("""
 <div class="header-bar">
   <div class="header-flex">
@@ -180,11 +180,11 @@ st.markdown("""
         </svg>
       </div>
       <div>
-        <div class="title">Analizador SECOP — COP</div>
+        <div class="title">Analizador SECOP I y II — COP</div>
         <div class="subtitle">Sistema de análisis exploratorio de contratación pública</div>
       </div>
     </div>
-    <div class="subtitle" style="font-weight:600;color:#1e3a8a;">v1.0 • Proyecto de Grado</div>
+    <div class="subtitle" style="font-weight:1000;color:#1e3a8a;">v1.0 • Proyecto de Grado</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
