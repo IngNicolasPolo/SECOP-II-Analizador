@@ -8,6 +8,67 @@ import streamlit as st
 # ---------- Config ----------
 st.set_page_config(page_title="Analizador SECOP - COP", layout="wide")
 
+# ---------- Estilos globales (Fase 1) ----------
+STYLES = """
+<style>
+:root {
+  --bg:#0e1117; --panel:#161a23; --card:#1b2030;
+  --text:#e5e7eb; --muted:#9ca3af; --accent:#22c55e; --accent2:#3b82f6;
+}
+html, body, [data-testid="stAppViewContainer"] { background: var(--bg); }
+header[data-testid="stHeader"] { background: transparent; }
+
+/* Header bar */
+.header-bar { position: sticky; top: 0; z-index: 999;
+  background: linear-gradient(180deg, rgba(14,17,23,.95) 0%, rgba(14,17,23,.85) 100%);
+  backdrop-filter: blur(6px); border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 10px 16px; margin-bottom: 8px;
+}
+.header-flex { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.brand { display:flex; align-items:center; gap:12px; }
+.brand .logo { width:34px; height:34px; border-radius:10px; background:#111827;
+  display:grid; place-items:center; font-size:18px; }
+.brand .title { font-weight:700; font-size:18px; color:var(--text); }
+.brand .subtitle { color:var(--muted); font-size:12px; margin-top:-2px; }
+
+/* KPI cards */
+.stat-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:16px; margin: 8px 0 6px; }
+.stat-card { background: var(--card); border:1px solid rgba(255,255,255,0.06);
+  border-radius:14px; padding:14px 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
+.stat-top { display:flex; align-items:center; justify-content:space-between; }
+.stat-ico { font-size:20px; opacity:.9 }
+.stat-label { color:var(--muted); font-size:12px; letter-spacing:.3px; }
+.stat-value { font-size:22px; font-weight:800; color:var(--text); margin-top:4px; }
+
+/* Sidebar / Popovers / Expander */
+div[data-testid="stSidebar"] { background: var(--panel); border-right: 1px solid rgba(255,255,255,0.06); }
+details[data-testid="stExpander"] > summary { background: var(--panel); border:1px solid rgba(255,255,255,0.06);
+  border-radius:10px; padding:8px 12px; }
+div[data-testid="stPopover"] > div { background: var(--panel) !important; border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px; box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+
+/* DataFrame */
+div[data-testid="stDataFrame"] { border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,0.06); }
+div[data-testid="stDataFrame"] thead tr th { background:#121723; color:#e5e7eb; font-weight:700; }
+
+/* Botones */
+div[data-testid="stDownloadButton"] > button,
+div[data-testid="stButton"] > button {
+  background: linear-gradient(180deg, var(--accent2), #2563eb);
+  color:white; border:0; border-radius:12px; padding:10px 14px; font-weight:700;
+}
+div[data-testid="stDownloadButton"] > button:hover,
+div[data-testid="stButton"] > button:hover {
+  filter:brightness(1.05); transform: translateY(-1px); transition: all .15s ease;
+}
+
+/* Footer */
+.footer { margin-top: 24px; padding: 10px 0 30px; color: var(--muted);
+  border-top:1px solid rgba(255,255,255,.06); text-align:center; font-size:12px;}
+</style>
+"""
+st.markdown(STYLES, unsafe_allow_html=True)
+
 # ---------- Utilidades ----------
 def fmt_cop(valor):
     try:
@@ -106,7 +167,22 @@ def limpiar(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ---------- App ----------
-st.title("🔎 Análisis de Contratación Pública - SECOP I y II")
+# ---------- Header ----------
+st.markdown("""
+<div class="header-bar">
+  <div class="header-flex">
+    <div class="brand">
+      <div class="logo">🔎</div>
+      <div>
+        <div class="title">Analizador SECOP — COP</div>
+        <div class="subtitle">Sistema de análisis exploratorio de contratación pública</div>
+      </div>
+    </div>
+    <div class="subtitle">v1.0 • Proyecto de Grado</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
 
 archivo = st.file_uploader("📂 Sube un archivo SECOP (.csv / .xlsx)", type=["csv","xlsx"])
 if archivo is None:
@@ -207,15 +283,37 @@ if "valor" in df_f.columns and rango_valor:
 if term_obj and "objeto" in df_f.columns:
     df_f = df_f[df_f["objeto"].str.contains(term_obj, na=False)]
 
-# ---------- KPIs ----------
-col1, col2, col3 = st.columns(3)
-total_contratos = len(df_f)
-total_valor = float(df_f["valor"].sum()) if "valor" in df_f else 0.0
-proveedores_unicos = int(df_f["proveedor"].nunique()) if "proveedor" in df_f else 0
 
-col1.metric("Contratos", f"{total_contratos:,}".replace(",", "."))
-col2.metric("Valor total (COP)", fmt_cop(total_valor))
-col3.metric("Proveedores únicos", f"{proveedores_unicos:,}".replace(",", "."))
+# ---------- KPIs (cards) ----------
+contratos_fmt = f"{total_contratos:,}".replace(",", ".")
+proveedores_fmt = f"{proveedores_unicos:,}".replace(",", ".")
+valor_fmt = fmt_cop(total_valor)
+
+st.markdown(f"""
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-top">
+      <div class="stat-label">Contratos</div>
+      <div class="stat-ico">🧾</div>
+    </div>
+    <div class="stat-value">{contratos_fmt}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-top">
+      <div class="stat-label">Valor total (COP)</div>
+      <div class="stat-ico">💰</div>
+    </div>
+    <div class="stat-value">{valor_fmt}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-top">
+      <div class="stat-label">Proveedores únicos</div>
+      <div class="stat-ico">👥</div>
+    </div>
+    <div class="stat-value">{proveedores_fmt}</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -275,3 +373,8 @@ if not df_view.empty:
         file_name="secop_filtrado.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+    
+    st.markdown(
+    '<div class="footer">Desarrollado por <b>Nicolás Polo</b> — Ingeniería de Sistemas (2025)</div>',
+    unsafe_allow_html=True
+)
