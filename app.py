@@ -12,28 +12,31 @@ st.set_page_config(page_title="Analizador SECOP - COP", layout="wide")
 STYLES = """
 <style>
 :root{
-  /* Paleta clara y sobria */
-  --bg:#f7f8fb;                 /* fondo general */
-  --panel:#ffffff;              /* paneles / sidebar / popover */
-  --card:#ffffff;               /* tarjetas */
-  --text:#1f2937;               /* texto principal (gris pizarra) */
-  --muted:#6b7280;              /* texto secundario */
-  --accent:#1e3a8a;             /* azul oscuro (primario) */
-  --accent2:#b58b00;            /* amarillo oscuro (secundario) */
-  --line:rgba(0,0,0,0.08);      /* bordes sutiles */
-  --chip-bg:#e9eefb;            /* chip/etiqueta seleccionada (azul muy suave) */
-  --chip-fg:#1e3a8a;            /* texto del chip */
+  /* Paleta sobria */
+  --bg:#f7f8fb;           /* fondo general */
+  --panel:#ffffff;        /* paneles (sidebar, popovers) */
+  --card:#ffffff;         /* tarjetas / contenedores */
+  --text:#1f2937;         /* texto principal (gris pizarra) */
+  --muted:#6b7280;        /* texto secundario */
+  --accent:#1e3a8a;       /* azul oscuro */
+  --accent2:#b58b00;      /* amarillo oscuro */
+  --line:rgba(0,0,0,0.08);
+  --chip-bg:#e9eefb;      /* chip/etiqueta seleccionada */
+  --chip-fg:#1e3a8a;
 }
-html, body, [data-testid="stAppViewContainer"]{ background:var(--bg); color:var(--text); }
-header[data-testid="stHeader"]{ background:transparent; }
 
-/* Header bar claro */
+html, body, [data-testid="stAppViewContainer"]{
+  background:var(--bg) !important; color:var(--text);
+}
+header[data-testid="stHeader"]{ background:transparent !important; }
+
+/* Header */
 .header-bar{
   position:sticky; top:0; z-index:999;
-  background:linear-gradient(180deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.9) 100%);
+  background:linear-gradient(180deg, rgba(255,255,255,.96) 0%, rgba(255,255,255,.92) 100%);
   backdrop-filter: blur(6px);
   border-bottom:1px solid var(--line);
-  padding:10px 16px; margin-bottom:8px;
+  padding:10px 16px; margin-bottom:12px;
 }
 .header-flex{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .brand{ display:flex; align-items:center; gap:12px; }
@@ -44,6 +47,45 @@ header[data-testid="stHeader"]{ background:transparent; }
 }
 .brand .title{ font-weight:700; font-size:18px; color:var(--text); }
 .brand .subtitle{ color:var(--muted); font-size:12px; margin-top:-2px; }
+
+/* Sidebar */
+div[data-testid="stSidebar"]{
+  background: #f9fafb !important;
+  border-right:1px solid var(--line) !important;
+  color: var(--text);
+}
+
+/* Popovers / Expander */
+details[data-testid="stExpander"] > summary{
+  background: var(--panel) !important; border:1px solid var(--line) !important;
+  border-radius:10px; padding:8px 12px;
+}
+div[data-testid="stPopover"] > div{
+  background: var(--panel) !important; border:1px solid var(--line) !important;
+  border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,.08);
+}
+
+/* File uploader (dropzone) */
+div[data-testid="stFileUploaderDropzone"]{
+  background:#f3f4f6 !important;
+  border:1px dashed #cbd5e1 !important;
+  color: var(--text) !important;
+}
+div[data-testid="stFileUploaderDropzone"] svg{ opacity:.65; }
+
+/* Multiselect chips */
+div[data-baseweb="tag"]{
+  background:var(--chip-bg) !important; color:var(--chip-fg) !important;
+  border-color:transparent !important;
+}
+
+/* Slider (rango años/valores) */
+div[data-baseweb="slider"] > div{ background:#e5e7eb !important; }        /* pista */
+div[data-baseweb="slider"] > div > div{ background:var(--accent) !important; } /* rango activo */
+div[data-baseweb="slider"] [role="slider"]{
+  background:#fff !important; border:2px solid var(--accent) !important;
+  box-shadow:0 2px 6px rgba(30,58,138,.2);
+}
 
 /* KPI cards */
 .stat-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:8px 0 6px; }
@@ -56,40 +98,31 @@ header[data-testid="stHeader"]{ background:transparent; }
 .stat-label{ color:var(--muted); font-size:12px; letter-spacing:.3px; }
 .stat-value{ font-size:22px; font-weight:800; color:var(--text); margin-top:4px; }
 
-/* Sidebar / Popovers / Expander en claro */
-div[data-testid="stSidebar"]{ background:var(--panel); border-right:1px solid var(--line); }
-details[data-testid="stExpander"] > summary{
-  background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px 12px;
-}
-div[data-testid="stPopover"] > div{
-  background:var(--panel) !important; border:1px solid var(--line);
-  border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,.08);
-}
-
-/* Chips (multiselect) en azul suave */
-div[data-baseweb="tag"]{
-  background:var(--chip-bg) !important; color:var(--chip-fg) !important;
-  border-color:transparent !important;
-}
-
 /* DataFrame claro */
-div[data-testid="stDataFrame"]{ border-radius:12px; overflow:hidden; border:1px solid var(--line); }
+div[data-testid="stDataFrame"]{
+  border-radius:12px; overflow:hidden; border:1px solid var(--line) !important;
+  background:#fff !important;
+}
 div[data-testid="stDataFrame"] thead tr th{
-  background:#f3f4f6; color:#111827; font-weight:700;
+  background:#eef2ff !important; color:#0f172a !important; font-weight:700 !important;
+  border-bottom:1px solid #dbe4ff !important;
+}
+div[data-testid="stDataFrame"] tbody tr td{
+  background:#fff !important; color:#111827 !important; border-color:#e5e7eb !important;
 }
 
-/* Botones: azul oscuro con sutil toque dorado en hover */
+/* Botones primarios */
 div[data-testid="stDownloadButton"] > button,
 div[data-testid="stButton"] > button{
-  background:linear-gradient(180deg, var(--accent), #172554);
-  color:white; border:0; border-radius:12px; padding:10px 14px; font-weight:700;
+  background:linear-gradient(180deg, var(--accent), #172554) !important;
+  color:white !important; border:0 !important; border-radius:12px; padding:10px 14px; font-weight:700;
 }
 div[data-testid="stDownloadButton"] > button:hover,
 div[data-testid="stButton"] > button:hover{
   box-shadow:0 6px 14px rgba(30,58,138,0.25);
   transform: translateY(-1px); transition:all .15s ease;
 }
-/* Variante sutil con borde amarillo oscuro para botones secundarios (si alguna vez la usas) */
+/* Botón secundario (si lo usas) */
 button[kind="secondary"]{
   background:#fff !important; color:var(--text) !important;
   border:1px solid var(--accent2) !important;
@@ -202,21 +235,27 @@ def limpiar(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ---------- App ----------
-# Header
+# ---------- Header (versión profesional con SVG azul) ----------
 st.markdown("""
 <div class="header-bar">
   <div class="header-flex">
     <div class="brand">
-      <div class="logo">🔎</div>
+      <div class="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="#1e3a8a" width="22" height="22">
+          <circle cx="11" cy="11" r="7" stroke="#1e3a8a" stroke-width="2" fill="none"></circle>
+          <line x1="16.65" y1="16.65" x2="22" y2="22" stroke="#1e3a8a" stroke-width="2" stroke-linecap="round"></line>
+        </svg>
+      </div>
       <div>
         <div class="title">Analizador SECOP — COP</div>
         <div class="subtitle">Sistema de análisis exploratorio de contratación pública</div>
       </div>
     </div>
-    <div class="subtitle">v1.0 • Proyecto de Grado</div>
+    <div class="subtitle" style="font-weight:600;color:#1e3a8a;">v1.0 • Proyecto de Grado</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
+
 
 # Carga de archivo
 archivo = st.file_uploader("📂 Sube un archivo SECOP (.csv / .xlsx)", type=["csv","xlsx"])
