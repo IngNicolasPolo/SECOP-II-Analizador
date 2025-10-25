@@ -9,130 +9,63 @@ import streamlit as st
 st.set_page_config(page_title="Analizador SECOP - COP", layout="wide")
 
 # ---------- Estilos globales ----------
+
 STYLES = """
 <style>
-:root{
-  /* Paleta sobria */
-  --bg:#f7f8fb;           /* fondo general */
-  --panel:#ffffff;        /* paneles (sidebar, popovers) */
-  --card:#ffffff;         /* tarjetas / contenedores */
-  --text:#1f2937;         /* texto principal (gris pizarra) */
-  --muted:#6b7280;        /* texto secundario */
-  --accent:#1e3a8a;       /* azul oscuro */
-  --accent2:#b58b00;      /* amarillo oscuro */
-  --line:rgba(0,0,0,0.08);
-  --chip-bg:#e9eefb;      /* chip/etiqueta seleccionada */
-  --chip-fg:#1e3a8a;
+:root {
+  --bg:#0e1117; --panel:#161a23; --card:#1b2030;
+  --text:#e5e7eb; --muted:#9ca3af; --accent:#22c55e; --accent2:#3b82f6;
 }
+html, body, [data-testid="stAppViewContainer"] { background: var(--bg); }
+header[data-testid="stHeader"] { background: transparent; }
 
-html, body, [data-testid="stAppViewContainer"]{
-  background:var(--bg) !important; color:var(--text);
+/* Header bar */
+.header-bar { position: sticky; top: 0; z-index: 999;
+  background: linear-gradient(180deg, rgba(14,17,23,.95) 0%, rgba(14,17,23,.85) 100%);
+  backdrop-filter: blur(6px); border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 10px 16px; margin-bottom: 8px;
 }
-header[data-testid="stHeader"]{ background:transparent !important; }
-
-/* Header */
-.header-bar{
-  position:sticky; top:0; z-index:999;
-  background:linear-gradient(180deg, rgba(255,255,255,.96) 0%, rgba(255,255,255,.92) 100%);
-  backdrop-filter: blur(6px);
-  border-bottom:1px solid var(--line);
-  padding:10px 16px; margin-bottom:12px;
-}
-.header-flex{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.brand{ display:flex; align-items:center; gap:12px; }
-.brand .logo{
-  width:34px; height:34px; border-radius:10px;
-  background:#eff4ff; color:var(--accent); display:grid; place-items:center; font-size:18px;
-  border:1px solid var(--line);
-}
-.brand .title{ font-weight:700; font-size:18px; color:var(--text); }
-.brand .subtitle{ color:var(--muted); font-size:12px; margin-top:-2px; }
-
-/* Sidebar */
-div[data-testid="stSidebar"]{
-  background: #f9fafb !important;
-  border-right:1px solid var(--line) !important;
-  color: var(--text);
-}
-
-/* Popovers / Expander */
-details[data-testid="stExpander"] > summary{
-  background: var(--panel) !important; border:1px solid var(--line) !important;
-  border-radius:10px; padding:8px 12px;
-}
-div[data-testid="stPopover"] > div{
-  background: var(--panel) !important; border:1px solid var(--line) !important;
-  border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,.08);
-}
-
-/* File uploader (dropzone) */
-div[data-testid="stFileUploaderDropzone"]{
-  background:#f3f4f6 !important;
-  border:1px dashed #cbd5e1 !important;
-  color: var(--text) !important;
-}
-div[data-testid="stFileUploaderDropzone"] svg{ opacity:.65; }
-
-/* Multiselect chips */
-div[data-baseweb="tag"]{
-  background:var(--chip-bg) !important; color:var(--chip-fg) !important;
-  border-color:transparent !important;
-}
-
-/* Slider (rango años/valores) */
-div[data-baseweb="slider"] > div{ background:#e5e7eb !important; }        /* pista */
-div[data-baseweb="slider"] > div > div{ background:var(--accent) !important; } /* rango activo */
-div[data-baseweb="slider"] [role="slider"]{
-  background:#fff !important; border:2px solid var(--accent) !important;
-  box-shadow:0 2px 6px rgba(30,58,138,.2);
-}
+.header-flex { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.brand { display:flex; align-items:center; gap:12px; }
+.brand .logo { width:34px; height:34px; border-radius:10px; background:#111827;
+  display:grid; place-items:center; font-size:18px; }
+.brand .title { font-weight:700; font-size:18px; color:var(--text); }
+.brand .subtitle { color:var(--muted); font-size:12px; margin-top:-2px; }
 
 /* KPI cards */
-.stat-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:8px 0 6px; }
-.stat-card{
-  background:var(--card); border:1px solid var(--line); border-radius:14px;
-  padding:14px 16px; box-shadow:0 6px 18px rgba(0,0,0,0.06);
-}
-.stat-top{ display:flex; align-items:center; justify-content:space-between; }
-.stat-ico{ font-size:20px; opacity:.9 }
-.stat-label{ color:var(--muted); font-size:12px; letter-spacing:.3px; }
-.stat-value{ font-size:22px; font-weight:800; color:var(--text); margin-top:4px; }
+.stat-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:16px; margin: 8px 0 6px; }
+.stat-card { background: var(--card); border:1px solid rgba(255,255,255,0.06);
+  border-radius:14px; padding:14px 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
+.stat-top { display:flex; align-items:center; justify-content:space-between; }
+.stat-ico { font-size:20px; opacity:.9 }
+.stat-label { color:var(--muted); font-size:12px; letter-spacing:.3px; }
+.stat-value { font-size:22px; font-weight:800; color:var(--text); margin-top:4px; }
 
-/* DataFrame claro */
-div[data-testid="stDataFrame"]{
-  border-radius:12px; overflow:hidden; border:1px solid var(--line) !important;
-  background:#fff !important;
-}
-div[data-testid="stDataFrame"] thead tr th{
-  background:#eef2ff !important; color:#0f172a !important; font-weight:700 !important;
-  border-bottom:1px solid #dbe4ff !important;
-}
-div[data-testid="stDataFrame"] tbody tr td{
-  background:#fff !important; color:#111827 !important; border-color:#e5e7eb !important;
-}
+/* Sidebar / Popovers / Expander */
+div[data-testid="stSidebar"] { background: var(--panel); border-right: 1px solid rgba(255,255,255,0.06); }
+details[data-testid="stExpander"] > summary { background: var(--panel); border:1px solid rgba(255,255,255,0.06);
+  border-radius:10px; padding:8px 12px; }
+div[data-testid="stPopover"] > div { background: var(--panel) !important; border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px; box-shadow: 0 12px 30px rgba(0,0,0,.35); }
 
-/* Botones primarios */
+/* DataFrame */
+div[data-testid="stDataFrame"] { border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,0.06); }
+div[data-testid="stDataFrame"] thead tr th { background:#121723; color:#e5e7eb; font-weight:700; }
+
+/* Botones */
 div[data-testid="stDownloadButton"] > button,
-div[data-testid="stButton"] > button{
-  background:linear-gradient(180deg, var(--accent), #172554) !important;
-  color:white !important; border:0 !important; border-radius:12px; padding:10px 14px; font-weight:700;
+div[data-testid="stButton"] > button {
+  background: linear-gradient(180deg, var(--accent2), #2563eb);
+  color:white; border:0; border-radius:12px; padding:10px 14px; font-weight:700;
 }
 div[data-testid="stDownloadButton"] > button:hover,
-div[data-testid="stButton"] > button:hover{
-  box-shadow:0 6px 14px rgba(30,58,138,0.25);
-  transform: translateY(-1px); transition:all .15s ease;
-}
-/* Botón secundario (si lo usas) */
-button[kind="secondary"]{
-  background:#fff !important; color:var(--text) !important;
-  border:1px solid var(--accent2) !important;
+div[data-testid="stButton"] > button:hover {
+  filter:brightness(1.05); transform: translateY(-1px); transition: all .15s ease;
 }
 
 /* Footer */
-.footer{
-  margin-top:24px; padding:10px 0 30px; color:var(--muted);
-  border-top:1px solid var(--line); text-align:center; font-size:12px;
-}
+.footer { margin-top: 24px; padding: 10px 0 30px; color: var(--muted);
+  border-top:1px solid rgba(255,255,255,.06); text-align:center; font-size:12px;}
 </style>
 """
 st.markdown(STYLES, unsafe_allow_html=True)
