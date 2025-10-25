@@ -167,7 +167,7 @@ def limpiar(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ---------- App ----------
-# ---------- Header ----------
+# Header
 st.markdown("""
 <div class="header-bar">
   <div class="header-flex">
@@ -183,7 +183,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-
+# Carga de archivo
 archivo = st.file_uploader("📂 Sube un archivo SECOP (.csv / .xlsx)", type=["csv","xlsx"])
 if archivo is None:
     st.info("Sube un archivo para comenzar.")
@@ -227,13 +227,12 @@ with st.sidebar:
         anio_rango = None
 
     entidades = sorted([x for x in df["entidad"].dropna().unique()]) if "entidad" in df else []
-    sel_all_ent = st.checkbox("Seleccionar todas las entidades", value=True)
 
     with st.popover("Entidad (múltiple)", use_container_width=True):
         entidad_sel = st.multiselect(
             "Selecciona entidades",
             entidades,
-            default=[],
+            default=[],  # sin selección por defecto
             placeholder="Buscar/seleccionar…"
         )
     st.caption(f"{len(entidad_sel)} entidades seleccionadas")
@@ -283,6 +282,10 @@ if "valor" in df_f.columns and rango_valor:
 if term_obj and "objeto" in df_f.columns:
     df_f = df_f[df_f["objeto"].str.contains(term_obj, na=False)]
 
+# ---------- KPIs: cálculos ----------
+total_contratos = len(df_f)
+total_valor = float(df_f["valor"].sum()) if "valor" in df_f else 0.0
+proveedores_unicos = int(df_f["proveedor"].nunique()) if "proveedor" in df_f else 0
 
 # ---------- KPIs (cards) ----------
 contratos_fmt = f"{total_contratos:,}".replace(",", ".")
@@ -338,17 +341,18 @@ plantilla = st.radio("Plantilla de columnas", ["Básico", "Detallado", "Personal
 tpl_basico = [c for c in ["entidad", "proveedor", "valor", "fecha", "anio"] if c in available_internal]
 tpl_detallado = [c for c in ["entidad","nit_proveedor","proveedor","departamento","tipo_contrato","valor","fecha","anio","mes","codigo_proceso","objeto"] if c in available_internal]
 pre_sel = tpl_basico if plantilla == "Básico" else tpl_detallado
+
 with st.popover("Elige las columnas a mostrar/descargar", use_container_width=True):
     cols_sel = st.multiselect(
         "Columnas",
         options=available_internal,
-        default=[],
+        default=[],  # sin columnas marcadas
         format_func=lambda c: friendly_cols.get(c, c),
         placeholder="Selecciona columnas…"
     )
 
-# Resumen compacto
 st.caption(f"{len(cols_sel)} columnas seleccionadas")
+
 if cols_sel:
     df_view = df_f[cols_sel].rename(columns=friendly_cols).copy()
 else:
@@ -373,8 +377,9 @@ if not df_view.empty:
         file_name="secop_filtrado.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    
-    st.markdown(
+
+# ---------- Footer (siempre visible) ----------
+st.markdown(
     '<div class="footer">Desarrollado por <b>Nicolás Polo</b> — Ingeniería de Sistemas (2025)</div>',
     unsafe_allow_html=True
 )
