@@ -8,63 +8,98 @@ import streamlit as st
 # ---------- Config ----------
 st.set_page_config(page_title="Analizador SECOP - COP", layout="wide")
 
-# ---------- Estilos globales (Fase 1) ----------
+# ---------- Estilos globales ----------
 STYLES = """
 <style>
-:root {
-  --bg:#0e1117; --panel:#161a23; --card:#1b2030;
-  --text:#e5e7eb; --muted:#9ca3af; --accent:#22c55e; --accent2:#3b82f6;
+:root{
+  /* Paleta clara y sobria */
+  --bg:#f7f8fb;                 /* fondo general */
+  --panel:#ffffff;              /* paneles / sidebar / popover */
+  --card:#ffffff;               /* tarjetas */
+  --text:#1f2937;               /* texto principal (gris pizarra) */
+  --muted:#6b7280;              /* texto secundario */
+  --accent:#1e3a8a;             /* azul oscuro (primario) */
+  --accent2:#b58b00;            /* amarillo oscuro (secundario) */
+  --line:rgba(0,0,0,0.08);      /* bordes sutiles */
+  --chip-bg:#e9eefb;            /* chip/etiqueta seleccionada (azul muy suave) */
+  --chip-fg:#1e3a8a;            /* texto del chip */
 }
-html, body, [data-testid="stAppViewContainer"] { background: var(--bg); }
-header[data-testid="stHeader"] { background: transparent; }
+html, body, [data-testid="stAppViewContainer"]{ background:var(--bg); color:var(--text); }
+header[data-testid="stHeader"]{ background:transparent; }
 
-/* Header bar */
-.header-bar { position: sticky; top: 0; z-index: 999;
-  background: linear-gradient(180deg, rgba(14,17,23,.95) 0%, rgba(14,17,23,.85) 100%);
-  backdrop-filter: blur(6px); border-bottom: 1px solid rgba(255,255,255,0.06);
-  padding: 10px 16px; margin-bottom: 8px;
+/* Header bar claro */
+.header-bar{
+  position:sticky; top:0; z-index:999;
+  background:linear-gradient(180deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.9) 100%);
+  backdrop-filter: blur(6px);
+  border-bottom:1px solid var(--line);
+  padding:10px 16px; margin-bottom:8px;
 }
-.header-flex { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.brand { display:flex; align-items:center; gap:12px; }
-.brand .logo { width:34px; height:34px; border-radius:10px; background:#111827;
-  display:grid; place-items:center; font-size:18px; }
-.brand .title { font-weight:700; font-size:18px; color:var(--text); }
-.brand .subtitle { color:var(--muted); font-size:12px; margin-top:-2px; }
+.header-flex{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.brand{ display:flex; align-items:center; gap:12px; }
+.brand .logo{
+  width:34px; height:34px; border-radius:10px;
+  background:#eff4ff; color:var(--accent); display:grid; place-items:center; font-size:18px;
+  border:1px solid var(--line);
+}
+.brand .title{ font-weight:700; font-size:18px; color:var(--text); }
+.brand .subtitle{ color:var(--muted); font-size:12px; margin-top:-2px; }
 
 /* KPI cards */
-.stat-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:16px; margin: 8px 0 6px; }
-.stat-card { background: var(--card); border:1px solid rgba(255,255,255,0.06);
-  border-radius:14px; padding:14px 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
-.stat-top { display:flex; align-items:center; justify-content:space-between; }
-.stat-ico { font-size:20px; opacity:.9 }
-.stat-label { color:var(--muted); font-size:12px; letter-spacing:.3px; }
-.stat-value { font-size:22px; font-weight:800; color:var(--text); margin-top:4px; }
+.stat-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:8px 0 6px; }
+.stat-card{
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:14px 16px; box-shadow:0 6px 18px rgba(0,0,0,0.06);
+}
+.stat-top{ display:flex; align-items:center; justify-content:space-between; }
+.stat-ico{ font-size:20px; opacity:.9 }
+.stat-label{ color:var(--muted); font-size:12px; letter-spacing:.3px; }
+.stat-value{ font-size:22px; font-weight:800; color:var(--text); margin-top:4px; }
 
-/* Sidebar / Popovers / Expander */
-div[data-testid="stSidebar"] { background: var(--panel); border-right: 1px solid rgba(255,255,255,0.06); }
-details[data-testid="stExpander"] > summary { background: var(--panel); border:1px solid rgba(255,255,255,0.06);
-  border-radius:10px; padding:8px 12px; }
-div[data-testid="stPopover"] > div { background: var(--panel) !important; border:1px solid rgba(255,255,255,0.08);
-  border-radius:12px; box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+/* Sidebar / Popovers / Expander en claro */
+div[data-testid="stSidebar"]{ background:var(--panel); border-right:1px solid var(--line); }
+details[data-testid="stExpander"] > summary{
+  background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px 12px;
+}
+div[data-testid="stPopover"] > div{
+  background:var(--panel) !important; border:1px solid var(--line);
+  border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,.08);
+}
 
-/* DataFrame */
-div[data-testid="stDataFrame"] { border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,0.06); }
-div[data-testid="stDataFrame"] thead tr th { background:#121723; color:#e5e7eb; font-weight:700; }
+/* Chips (multiselect) en azul suave */
+div[data-baseweb="tag"]{
+  background:var(--chip-bg) !important; color:var(--chip-fg) !important;
+  border-color:transparent !important;
+}
 
-/* Botones */
+/* DataFrame claro */
+div[data-testid="stDataFrame"]{ border-radius:12px; overflow:hidden; border:1px solid var(--line); }
+div[data-testid="stDataFrame"] thead tr th{
+  background:#f3f4f6; color:#111827; font-weight:700;
+}
+
+/* Botones: azul oscuro con sutil toque dorado en hover */
 div[data-testid="stDownloadButton"] > button,
-div[data-testid="stButton"] > button {
-  background: linear-gradient(180deg, var(--accent2), #2563eb);
+div[data-testid="stButton"] > button{
+  background:linear-gradient(180deg, var(--accent), #172554);
   color:white; border:0; border-radius:12px; padding:10px 14px; font-weight:700;
 }
 div[data-testid="stDownloadButton"] > button:hover,
-div[data-testid="stButton"] > button:hover {
-  filter:brightness(1.05); transform: translateY(-1px); transition: all .15s ease;
+div[data-testid="stButton"] > button:hover{
+  box-shadow:0 6px 14px rgba(30,58,138,0.25);
+  transform: translateY(-1px); transition:all .15s ease;
+}
+/* Variante sutil con borde amarillo oscuro para botones secundarios (si alguna vez la usas) */
+button[kind="secondary"]{
+  background:#fff !important; color:var(--text) !important;
+  border:1px solid var(--accent2) !important;
 }
 
 /* Footer */
-.footer { margin-top: 24px; padding: 10px 0 30px; color: var(--muted);
-  border-top:1px solid rgba(255,255,255,.06); text-align:center; font-size:12px;}
+.footer{
+  margin-top:24px; padding:10px 0 30px; color:var(--muted);
+  border-top:1px solid var(--line); text-align:center; font-size:12px;
+}
 </style>
 """
 st.markdown(STYLES, unsafe_allow_html=True)
