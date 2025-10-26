@@ -355,34 +355,43 @@ friendly_cols = {
     "objeto": "Objeto / Descripción",
 }
 available_internal = [c for c in friendly_cols.keys() if c in df_f.columns]
+
+# Plantillas
+tpl_basico     = [c for c in ["entidad", "proveedor", "valor", "fecha", "anio"] if c in available_internal]
+tpl_detallado  = [c for c in ["entidad","nit_proveedor","proveedor","departamento","tipo_contrato","valor","fecha","anio","mes","codigo_proceso","objeto"] if c in available_internal]
+
 plantilla = st.radio("Plantilla de columnas", ["Básico", "Detallado", "Personalizado"], horizontal=True)
-tpl_basico = [c for c in ["entidad", "proveedor", "valor", "fecha", "anio"] if c in available_internal]
-tpl_detallado = [c for c in ["entidad","nit_proveedor","proveedor","departamento","tipo_contrato","valor","fecha","anio","mes","codigo_proceso","objeto"] if c in available_internal]
-pre_sel = tpl_basico if plantilla == "Básico" else tpl_detallado
+
+# Si eligen plantilla (≠ personalizado), precargamos columnas
+if plantilla == "Básico":
+    default_cols = tpl_basico
+elif plantilla == "Detallado":
+    default_cols = tpl_detallado
+else:  # Personalizado
+    default_cols = []
 
 with st.popover("Elige las columnas a mostrar/descargar", use_container_width=True):
     cols_sel = st.multiselect(
         "Columnas",
         options=available_internal,
-        default=[],  # sin columnas marcadas
+        default=default_cols,  # <— aquí la clave: precargamos si NO es personalizado
         format_func=lambda c: friendly_cols.get(c, c),
         placeholder="Selecciona columnas…"
     )
 
+# Si el usuario no toca nada y está en plantilla, usa la plantilla
+if not cols_sel and plantilla != "Personalizado":
+    cols_sel = default_cols
+
 st.caption(f"{len(cols_sel)} columnas seleccionadas")
 
+# Vista + descargas
 if cols_sel:
     df_view = df_f[cols_sel].rename(columns=friendly_cols).copy()
-else:
-    st.info("Selecciona al menos una columna para ver la tabla.")
-    df_view = pd.DataFrame()
+    st.dataframe(df_view.head(20), use_container_width=True)
 
-st.dataframe(df_view.head(20), use_container_width=True)
-
-# ---------- Descargas locales ----------
-st.markdown("---")
-colA, colB = st.columns(2)
-if not df_view.empty:
+    st.markdown("---")
+    colA, colB = st.columns(2)
     csv_bytes = df_view.to_csv(index=False).encode("utf-8")
     colA.download_button("📥 Descargar Datos Limpios (CSV)", data=csv_bytes, file_name="secop_filtrado.csv", mime="text/csv")
 
@@ -395,23 +404,29 @@ if not df_view.empty:
         file_name="secop_filtrado.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+else:
+    st.info("Selecciona columnas (o una plantilla) para ver y descargar los datos.")
+    df_view = pd.DataFrame()
 
-# >>> NEW: Botón para abrir Looker Studio con el filtro de entidad
+# ---------- Botón Looker (multi-entidad) ----------
 st.markdown("---")
 st.subheader("📈 Reporte interactivo (Looker Studio)")
 
-# regla: debe haber EXACTAMENTE 1 entidad seleccionada para mandar el filtro
-if len(entidad_sel) == 1:
-    entidad_for_param = entidad_sel[0]  # viene en MAYÚSCULAS normalizadas en tu app
-    # construimos link con minúsculas (para tu fórmula LOWER(TRIM(...)) en Looker)
-    looker_link = build_looker_url(entidad_for_param)
-    # preferimos link_button si tu versión de Streamlit lo trae
+if entidad_sel and len(entidad_sel) >= 1:
+    looker_link = build_looker_url_multi(entidad_sel)
     if getattr(st, "link_button", None):
-        st.link_button("🔗 Ver en Looker Studio con estos filtros", looker_link, help="Se abrirá en una nueva pestaña")
+        st.link_button("🔗 Ver en Looker Studio con estas entidades", looker_link, help="Se abrirá en una nueva pestaña")
     else:
-        st.markdown(f'<a href="{looker_link}" target="_blank"><button>🔗 Ver en Looker Studio con estos filtros</button></a>', unsafe_allow_html=True)
+        st.markdown(
+            f'<a href="{looker_link}" target="_blank">'
+            f'<button style="background:linear-gradient(180deg,var(--accent2),#2563eb);'
+            f'color:white;border:0;border-radius:12px;padding:10px 14px;font-weight:700;">'
+            f'🔗 Ver en Looker Studio con estas entidades</button></a>',
+            unsafe_allow_html=True
+        )
 else:
-    st.warning("Selecciona **exactamente 1 entidad** en los filtros de la izquierda para habilitar el botón del reporte.")
+    st.info("Selecciona una o varias **entidades** para habilitar el botón del reporte.")
+
 
 # ---------- Footer (siempre visible) ----------
 st.markdown(
