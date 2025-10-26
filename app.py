@@ -284,21 +284,37 @@ with st.sidebar:
         term_obj = st.text_input("Buscar en objeto (palabra clave)", value="").strip().lower()
 
 # aplicar filtros
+# ---------- APLICAR FILTROS ----------
 df_f = df.copy()
+
+# Año
 if anio_rango and "anio" in df_f.columns:
     a0, a1 = anio_rango
     df_f = df_f[(df_f["anio"] >= a0) & (df_f["anio"] <= a1)]
+
+# Entidad
 if entidad_sel:
     df_f = df_f[df_f["entidad"].isin(entidad_sel)]
-if dep_sel:
+
+# Departamento
+if 'dep_sel' in locals() and dep_sel:
     df_f = df_f[df_f["departamento"].isin(dep_sel)]
-if tipo_sel:
+
+# Tipo de contrato
+if 'tipo_sel' in locals() and tipo_sel:
     df_f = df_f[df_f["tipo_contrato"].isin(tipo_sel)]
-if "valor" in df_f.columns and rango_valor:
+
+# Rango de valor
+if "valor" in df_f.columns and 'rango_valor' in locals() and rango_valor:
     v0, v1 = rango_valor
     df_f = df_f[(df_f["valor"] >= v0) & (df_f["valor"] <= v1)]
-if term_obj and "objeto" in df_f.columns:
+
+# Búsqueda en objeto
+if 'term_obj' in locals() and term_obj and "objeto" in df_f.columns:
     df_f = df_f[df_f["objeto"].str.contains(term_obj, na=False)]
+
+# ☑️ Línea de chequeo (te muestra cuántas filas quedan)
+st.caption(f"Filas filtradas: {len(df_f):,} de {len(df):,}".replace(",", "."))
 
 # ---------- KPIs: cálculos ----------
 total_contratos = len(df_f)
