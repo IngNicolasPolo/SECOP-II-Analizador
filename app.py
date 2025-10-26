@@ -245,6 +245,13 @@ with st.sidebar:
     else:
         anio_rango = None
 
+    # Rango de valores (COP) robusto
+    if "valor" in df.columns and df["valor"].notna().any():
+        vmin = float(max(0, df["valor"].min()))
+        vmax = float(df["valor"].max())
+    else:
+        vmin, vmax = 0.0, 0.0
+
     rango_valor = st.slider(
         "Rango de valores (COP)",
         min_value=float(vmin),
