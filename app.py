@@ -4,12 +4,16 @@ import unicodedata
 import io
 import pandas as pd
 import streamlit as st
+# >>> NEW: para codificar el parámetro en la URL
+from urllib.parse import quote
 
 # ---------- Config ----------
 st.set_page_config(page_title="Analizador SECOP - COP", layout="wide")
 
-# ---------- Estilos globales ----------
+# >>> NEW: URL base de tu reporte de Looker Studio (modo Ver)
+LOOKER_BASE_URL = "https://lookerstudio.google.com/u/1/reporting/bc878e05-ec76-4918-ace9-d32bb296b45a/page/wh5cF"
 
+# ---------- Estilos globales ----------
 STYLES = """
 <style>
 :root {
@@ -107,6 +111,14 @@ def to_number(x):
     except Exception:
         return 0.0
 
+# >>> NEW: helper para armar el URL con p_entidad
+def build_looker_url(entidad_text: str) -> str:
+    if not entidad_text:
+        return LOOKER_BASE_URL
+    # pasamos a minúsculas y codificamos espacios/acentos
+    param = f"p_entidad:{entidad_text.strip().lower()}"
+    return f"{LOOKER_BASE_URL}?params=" + quote(param, safe=":,")
+
 # ---------- Mapeo flexible ----------
 COLUMN_MAP = {
     "entidad": ["Entidad","entidad","nombre_entidad","entidad contratante","nombre de la entidad","entidad_estatal","buyer","buyername"],
@@ -188,7 +200,6 @@ st.markdown("""
   </div>
 </div>
 """, unsafe_allow_html=True)
-
 
 # Carga de archivo
 archivo = st.file_uploader("📂 Sube un archivo SECOP (.csv / .xlsx)", type=["csv","xlsx"])
@@ -373,17 +384,34 @@ st.markdown("---")
 colA, colB = st.columns(2)
 if not df_view.empty:
     csv_bytes = df_view.to_csv(index=False).encode("utf-8")
-    colA.download_button("📥 Descargar (CSV)", data=csv_bytes, file_name="secop_filtrado.csv", mime="text/csv")
+    colA.download_button("📥 Descargar Datos Limpios (CSV)", data=csv_bytes, file_name="secop_filtrado.csv", mime="text/csv")
 
     buffer_xlsx = io.BytesIO()
     with pd.ExcelWriter(buffer_xlsx, engine="xlsxwriter") as writer:
         df_view.to_excel(writer, index=False, sheet_name="DatosFiltrados")
     colB.download_button(
-        "📥 Descargar (Excel)",
+        "📥 Descargar Datos Limpios (Excel)",
         data=buffer_xlsx.getvalue(),
         file_name="secop_filtrado.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+# >>> NEW: Botón para abrir Looker Studio con el filtro de entidad
+st.markdown("---")
+st.subheader("📈 Reporte interactivo (Looker Studio)")
+
+# regla: debe haber EXACTAMENTE 1 entidad seleccionada para mandar el filtro
+if len(entidad_sel) == 1:
+    entidad_for_param = entidad_sel[0]  # viene en MAYÚSCULAS normalizadas en tu app
+    # construimos link con minúsculas (para tu fórmula LOWER(TRIM(...)) en Looker)
+    looker_link = build_looker_url(entidad_for_param)
+    # preferimos link_button si tu versión de Streamlit lo trae
+    if getattr(st, "link_button", None):
+        st.link_button("🔗 Ver en Looker Studio con estos filtros", looker_link, help="Se abrirá en una nueva pestaña")
+    else:
+        st.markdown(f'<a href="{looker_link}" target="_blank"><button>🔗 Ver en Looker Studio con estos filtros</button></a>', unsafe_allow_html=True)
+else:
+    st.warning("Selecciona **exactamente 1 entidad** en los filtros de la izquierda para habilitar el botón del reporte.")
 
 # ---------- Footer (siempre visible) ----------
 st.markdown(
