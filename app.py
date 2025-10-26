@@ -231,6 +231,7 @@ df = limpiar(df_raw)
 with st.sidebar:
     st.header("Filtros")
 
+    # Rango de años (si existe la columna)
     if "anio" in df.columns and df["anio"].notna().any():
         min_anio = int(df["anio"].min())
         max_anio = int(df["anio"].max())
@@ -244,46 +245,27 @@ with st.sidebar:
     else:
         anio_rango = None
 
-    entidades = sorted([x for x in df["entidad"].dropna().unique()]) if "entidad" in df else []
+    # Rango de valores (COP) robusto
+    if "valor" in df.columns and df["valor"].notna().any():
+        vmin = float(max(0, df["valor"].min()))
+        vmax = float(df["valor"].max())
+    else:
+        vmin, vmax = 0.0, 0.0
 
-    with st.popover("Entidad (múltiple)", use_container_width=True):
-        entidad_sel = st.multiselect(
-            "Selecciona entidades",
-            entidades,
-            default=[],  # sin selección por defecto
-            placeholder="Buscar/seleccionar…"
-        )
-    st.caption(f"{len(entidad_sel)} entidades seleccionadas")
+    rango_valor = st.slider(
+        "Rango de valores (COP)",
+        min_value=float(vmin),
+        max_value=float(max(vmin, vmax)),
+        value=(float(vmin), float(max(vmin, vmax))),
+        step=1.0
+    )
 
-    with st.expander("Filtros avanzados"):
-        if "departamento" in df.columns:
-            deps = sorted([x for x in df["departamento"].dropna().unique()])
-            with st.popover("Departamento", use_container_width=True):
-                dep_sel = st.multiselect("Departamento", deps, default=[])
-        else:
-            dep_sel = []
+    # Búsqueda por palabra clave en el objeto
+    term_obj = st.text_input(
+        "Buscar en objeto (palabra clave)",
+        value=""
+    ).strip().lower()
 
-        if "tipo_contrato" in df.columns:
-            tipos = sorted([x for x in df["tipo_contrato"].dropna().unique()])
-            with st.popover("Tipo de contrato", use_container_width=True):
-                tipo_sel = st.multiselect("Tipo de contrato", tipos, default=[])
-        else:
-            tipo_sel = []
-
-        vmin, vmax = 0.0, float(df["valor"].max()) if "valor" in df else 0.0
-        if vmax is None or pd.isna(vmax):
-            vmax = 0.0
-        rango_valor = st.slider(
-            "Rango de valores (COP)",
-            min_value=float(vmin),
-            max_value=float(vmax),
-            value=(float(vmin), float(vmax)),
-            step=1.0
-        )
-
-        term_obj = st.text_input("Buscar en objeto (palabra clave)", value="").strip().lower()
-
-# aplicar filtros
 # ---------- APLICAR FILTROS ----------
 df_f = df.copy()
 
@@ -292,28 +274,16 @@ if anio_rango and "anio" in df_f.columns:
     a0, a1 = anio_rango
     df_f = df_f[(df_f["anio"] >= a0) & (df_f["anio"] <= a1)]
 
-# Entidad
-if entidad_sel:
-    df_f = df_f[df_f["entidad"].isin(entidad_sel)]
-
-# Departamento
-if 'dep_sel' in locals() and dep_sel:
-    df_f = df_f[df_f["departamento"].isin(dep_sel)]
-
-# Tipo de contrato
-if 'tipo_sel' in locals() and tipo_sel:
-    df_f = df_f[df_f["tipo_contrato"].isin(tipo_sel)]
-
 # Rango de valor
-if "valor" in df_f.columns and 'rango_valor' in locals() and rango_valor:
+if "valor" in df_f.columns and rango_valor:
     v0, v1 = rango_valor
     df_f = df_f[(df_f["valor"] >= v0) & (df_f["valor"] <= v1)]
 
-# Búsqueda en objeto
-if 'term_obj' in locals() and term_obj and "objeto" in df_f.columns:
+# Texto en objeto
+if term_obj and "objeto" in df_f.columns:
     df_f = df_f[df_f["objeto"].str.contains(term_obj, na=False)]
 
-# ☑️ Línea de chequeo (te muestra cuántas filas quedan)
+# Chequeo visual
 st.caption(f"Filas filtradas: {len(df_f):,} de {len(df):,}".replace(",", "."))
 
 # ---------- KPIs: cálculos ----------
@@ -424,28 +394,14 @@ else:
     st.info("Selecciona columnas (o una plantilla) para ver y descargar los datos.")
     df_view = pd.DataFrame()
 
-# ---------- Reporte interactivo (Looker Studio) ----------
 st.markdown("---")
 st.subheader("📈 Reporte interactivo (Looker Studio)")
 
-# ✅ Nueva función para múltiples entidades
-def build_looker_url_multi(entidades: list) -> str:
-    if not entidades:
-        return LOOKER_BASE_URL
-    # Une todas las entidades separadas por comas
-    entidades_limpias = [e.strip().lower() for e in entidades]
-    param = "p_entidad:" + ",".join(entidades_limpias)
-    return f"{LOOKER_BASE_URL}?params=" + quote(param, safe=":,")
-
-# Si hay al menos una entidad seleccionada, crea el link
-if entidad_sel:
-    looker_link = build_looker_url_multi(entidad_sel)
-    if getattr(st, "link_button", None):
-        st.link_button("🔗 Ver reporte filtrado en Looker Studio", looker_link, help="Se abrirá en una nueva pestaña")
-    else:
-        st.markdown(f'<a href="{looker_link}" target="_blank"><button>🔗 Ver reporte filtrado en Looker Studio</button></a>', unsafe_allow_html=True)
+# Enlace directo, sin depender de entidades
+if getattr(st, "link_button", None):
+    st.link_button("🔗 Abrir reporte interactivo en Looker Studio", LOOKER_BASE_URL, help="Se abrirá en una nueva pestaña")
 else:
-    st.warning("Selecciona al menos **una entidad** para ver el reporte en Looker Studio.")
+    st.markdown(f'<a href="{LOOKER_BASE_URL}" target="_blank"><button>🔗 Abrir reporte interactivo en Looker Studio</button></a>', unsafe_allow_html=True)
 
 # ---------- Footer (siempre visible) ----------
 st.markdown(
