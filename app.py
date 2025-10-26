@@ -408,25 +408,28 @@ else:
     st.info("Selecciona columnas (o una plantilla) para ver y descargar los datos.")
     df_view = pd.DataFrame()
 
-# ---------- Botón Looker (multi-entidad) ----------
+# ---------- Reporte interactivo (Looker Studio) ----------
 st.markdown("---")
 st.subheader("📈 Reporte interactivo (Looker Studio)")
 
-if entidad_sel and len(entidad_sel) >= 1:
+# ✅ Nueva función para múltiples entidades
+def build_looker_url_multi(entidades: list) -> str:
+    if not entidades:
+        return LOOKER_BASE_URL
+    # Une todas las entidades separadas por comas
+    entidades_limpias = [e.strip().lower() for e in entidades]
+    param = "p_entidad:" + ",".join(entidades_limpias)
+    return f"{LOOKER_BASE_URL}?params=" + quote(param, safe=":,")
+
+# Si hay al menos una entidad seleccionada, crea el link
+if entidad_sel:
     looker_link = build_looker_url_multi(entidad_sel)
     if getattr(st, "link_button", None):
-        st.link_button("🔗 Ver en Looker Studio con estas entidades", looker_link, help="Se abrirá en una nueva pestaña")
+        st.link_button("🔗 Ver reporte filtrado en Looker Studio", looker_link, help="Se abrirá en una nueva pestaña")
     else:
-        st.markdown(
-            f'<a href="{looker_link}" target="_blank">'
-            f'<button style="background:linear-gradient(180deg,var(--accent2),#2563eb);'
-            f'color:white;border:0;border-radius:12px;padding:10px 14px;font-weight:700;">'
-            f'🔗 Ver en Looker Studio con estas entidades</button></a>',
-            unsafe_allow_html=True
-        )
+        st.markdown(f'<a href="{looker_link}" target="_blank"><button>🔗 Ver reporte filtrado en Looker Studio</button></a>', unsafe_allow_html=True)
 else:
-    st.info("Selecciona una o varias **entidades** para habilitar el botón del reporte.")
-
+    st.warning("Selecciona al menos **una entidad** para ver el reporte en Looker Studio.")
 
 # ---------- Footer (siempre visible) ----------
 st.markdown(
