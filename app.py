@@ -245,20 +245,29 @@ with st.sidebar:
     else:
         anio_rango = None
 
-    # Rango de valores (COP) robusto
-    if "valor" in df.columns and df["valor"].notna().any():
-        vmin = float(max(0, df["valor"].min()))
-        vmax = float(df["valor"].max())
-    else:
-        vmin, vmax = 0.0, 0.0
+# ---------- Filtros (sidebar) ----------
+with st.sidebar:
+    st.header("Filtros")
 
-    rango_valor = st.slider(
-        "Rango de valores (COP)",
-        min_value=float(vmin),
-        max_value=float(max(vmin, vmax)),
-        value=(float(vmin), float(max(vmin, vmax))),
-        step=1.0
-    )
+    # Rango de años (si existe la columna)
+    if "anio" in df.columns and df["anio"].notna().any():
+        min_anio = int(df["anio"].min())
+        max_anio = int(df["anio"].max())
+        anio_rango = st.slider(
+            "Rango de años",
+            min_value=min_anio,
+            max_value=max_anio,
+            value=(min_anio, max_anio),
+            step=1
+        )
+    else:
+        anio_rango = None
+
+    # Búsqueda por palabra clave en el objeto
+    term_obj = st.text_input(
+        "Buscar en objeto (palabra clave)",
+        value=""
+    ).strip().lower()
 
     # Búsqueda por palabra clave en el objeto
     term_obj = st.text_input(
@@ -273,11 +282,6 @@ df_f = df.copy()
 if anio_rango and "anio" in df_f.columns:
     a0, a1 = anio_rango
     df_f = df_f[(df_f["anio"] >= a0) & (df_f["anio"] <= a1)]
-
-# Rango de valor
-if "valor" in df_f.columns and rango_valor:
-    v0, v1 = rango_valor
-    df_f = df_f[(df_f["valor"] >= v0) & (df_f["valor"] <= v1)]
 
 # Texto en objeto
 if term_obj and "objeto" in df_f.columns:
@@ -378,12 +382,43 @@ if cols_sel:
 
     st.markdown("---")
     colA, colB = st.columns(2)
-    csv_bytes = df_view.to_csv(index=False).encode("utf-8")
-    colA.download_button("📥 Descargar Datos Limpios (CSV)", data=csv_bytes, file_name="secop_filtrado.csv", mime="text/csv")
 
+    # CSV -> dato crudo, sin formato (eso está bien)
+    csv_bytes = df_view.to_csv(index=False).encode("utf-8")
+    colA.download_button(
+        "📥 Descargar Datos Limpios (CSV)",
+        data=csv_bytes,
+        file_name="secop_filtrado.csv",
+        mime="text/csv"
+    )
+
+    # Excel con formato (xlsxwriter)
     buffer_xlsx = io.BytesIO()
     with pd.ExcelWriter(buffer_xlsx, engine="xlsxwriter") as writer:
         df_view.to_excel(writer, index=False, sheet_name="DatosFiltrados")
+
+        workbook  = writer.book
+        worksheet = writer.sheets["DatosFiltrados"]
+
+        # Formatos
+        formato_valor = workbook.add_format({'num_format': '#,##0'})
+        formato_fecha = workbook.add_format({'num_format': 'yyyy-mm-dd'})
+
+        # Ajuste de columnas según nombre
+        for idx, col in enumerate(df_view.columns):
+            col_upper = col.upper()
+            if "VALOR" in col_upper or "COP" in col_upper:
+                # columna de dinero
+                worksheet.set_column(idx, idx, 18, formato_valor)
+            elif "FECHA" in col_upper:
+                # columna de fecha
+                worksheet.set_column(idx, idx, 15, formato_fecha)
+            else:
+                # resto de columnas
+                worksheet.set_column(idx, idx, 20)
+
+    buffer_xlsx.seek(0)
+
     colB.download_button(
         "📥 Descargar Datos Limpios (Excel)",
         data=buffer_xlsx.getvalue(),
@@ -396,6 +431,7 @@ else:
 
 st.markdown("---")
 st.subheader("📈 Reporte interactivo (Looker Studio)")
+
 
 # Enlace directo, sin depender de entidades
 if getattr(st, "link_button", None):
