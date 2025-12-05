@@ -382,43 +382,12 @@ if cols_sel:
 
     st.markdown("---")
     colA, colB = st.columns(2)
-
-    # CSV -> dato crudo, sin formato (eso está bien)
     csv_bytes = df_view.to_csv(index=False).encode("utf-8")
-    colA.download_button(
-        "📥 Descargar Datos Limpios (CSV)",
-        data=csv_bytes,
-        file_name="secop_filtrado.csv",
-        mime="text/csv"
-    )
+    colA.download_button("📥 Descargar Datos Limpios (CSV)", data=csv_bytes, file_name="secop_filtrado.csv", mime="text/csv")
 
-    # Excel con formato (xlsxwriter)
     buffer_xlsx = io.BytesIO()
     with pd.ExcelWriter(buffer_xlsx, engine="xlsxwriter") as writer:
         df_view.to_excel(writer, index=False, sheet_name="DatosFiltrados")
-
-        workbook  = writer.book
-        worksheet = writer.sheets["DatosFiltrados"]
-
-        # Formatos
-        formato_valor = workbook.add_format({'num_format': '#,##0'})
-        formato_fecha = workbook.add_format({'num_format': 'yyyy-mm-dd'})
-
-        # Ajuste de columnas según nombre
-        for idx, col in enumerate(df_view.columns):
-            col_upper = col.upper()
-            if "VALOR" in col_upper or "COP" in col_upper:
-                # columna de dinero
-                worksheet.set_column(idx, idx, 18, formato_valor)
-            elif "FECHA" in col_upper:
-                # columna de fecha
-                worksheet.set_column(idx, idx, 15, formato_fecha)
-            else:
-                # resto de columnas
-                worksheet.set_column(idx, idx, 20)
-
-    buffer_xlsx.seek(0)
-
     colB.download_button(
         "📥 Descargar Datos Limpios (Excel)",
         data=buffer_xlsx.getvalue(),
@@ -431,7 +400,6 @@ else:
 
 st.markdown("---")
 st.subheader("📈 Reporte interactivo (Looker Studio)")
-
 
 # Enlace directo, sin depender de entidades
 if getattr(st, "link_button", None):
