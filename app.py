@@ -252,12 +252,6 @@ with st.sidebar:
         value=""
     ).strip().lower()
 
-    # Búsqueda por palabra clave en el objeto
-    term_obj = st.text_input(
-        "Buscar en objeto (palabra clave)",
-        value=""
-    ).strip().lower()
-
 # ---------- APLICAR FILTROS ----------
 df_f = df.copy()
 
