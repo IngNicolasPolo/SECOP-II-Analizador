@@ -227,23 +227,6 @@ st.dataframe(df_raw.head(20), use_container_width=True)
 # ---------- ETL ----------
 df = limpiar(df_raw)
 
-# ---------- Filtros (sidebar) ----------
-with st.sidebar:
-    st.header("Filtros")
-
-    # Rango de años (si existe la columna)
-    if "anio" in df.columns and df["anio"].notna().any():
-        min_anio = int(df["anio"].min())
-        max_anio = int(df["anio"].max())
-        anio_rango = st.slider(
-            "Rango de años",
-            min_value=min_anio,
-            max_value=max_anio,
-            value=(min_anio, max_anio),
-            step=1
-        )
-    else:
-        anio_rango = None
 
 # ---------- Filtros (sidebar) ----------
 with st.sidebar:
